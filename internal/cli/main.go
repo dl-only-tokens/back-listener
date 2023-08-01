@@ -3,7 +3,7 @@ package cli
 import (
 	"github.com/alecthomas/kingpin"
 	"github.com/dl-only-tokens/back-listener/internal/config"
-	"github.com/dl-only-tokens/back-listener/internal/service"
+	"github.com/dl-only-tokens/back-listener/internal/service/api"
 	"gitlab.com/distributed_lab/kit/kv"
 	"gitlab.com/distributed_lab/logan/v3"
 )
@@ -39,7 +39,7 @@ func Run(args []string) bool {
 
 	switch cmd {
 	case serviceCmd.FullCommand():
-		service.Run(cfg)
+		api.Run(cfg)
 	case migrateUpCmd.FullCommand():
 		err = MigrateUp(cfg)
 	case migrateDownCmd.FullCommand():
