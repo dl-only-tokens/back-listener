@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	"gitlab.com/distributed_lab/logan/v3"
@@ -16,6 +17,8 @@ import (
 type Listener interface {
 	Run(wg *sync.WaitGroup) error
 	HealthCheck() error
+	decodeData(log types.Log) []byte
+	filterByMetaData(logs []types.Log) []types.Log
 }
 
 type ListenData struct {
@@ -81,7 +84,7 @@ func (l *ListenData) Run(wg *sync.WaitGroup) error {
 			if previewHash == hash {
 				continue
 			}
-			log.Println("--------------------------------------------")
+			log.Println("--------------------------------------------") //todo  remove  it
 			query := ethereum.FilterQuery{
 				BlockHash: &hash,
 				Addresses: []common.Address{contractAddress},
@@ -92,6 +95,8 @@ func (l *ListenData) Run(wg *sync.WaitGroup) error {
 			if err != nil {
 				return errors.Wrap(err, "failed to filter logs ")
 			}
+
+			sub = l.filterByMetaData(sub)
 
 			l.log.Info(fmt.Sprintf("id: %s  %s", l.id, sub))
 			break
@@ -106,4 +111,18 @@ func (l *ListenData) HealthCheck() error {
 	}
 
 	return nil
+}
+
+func (l *ListenData) filterByMetaData(logs []types.Log) []types.Log {
+	for _, log := range logs {
+		//todo  decode data and  filter its
+		l.decodeData(log)
+	}
+	return logs
+}
+
+func (l *ListenData) decodeData(log types.Log) []byte {
+	//todo  update it
+	//log.Data
+	return log.Data
 }

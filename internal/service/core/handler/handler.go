@@ -88,11 +88,9 @@ func (h *ListenerHandler) healthCheck() error {
 }
 
 func (h *ListenerHandler) getContractsAddresses() ([]rarimo.Data, error) {
-	//todo remove it rarimo  package
-
 	resp, err := http.Get(h.rarimoAPI)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to send  request")
+		return nil, errors.Wrap(err, "failed to send request")
 	}
 
 	if resp.StatusCode >= 300 && resp.StatusCode < 500 {
@@ -102,7 +100,7 @@ func (h *ListenerHandler) getContractsAddresses() ([]rarimo.Data, error) {
 	decodedResponse := new(rarimo.NetworkListResponse)
 
 	if err := json.NewDecoder(resp.Body).Decode(&decodedResponse); err != nil {
-		return nil, errors.New("failed to  decode response ")
+		return nil, errors.New("failed to decode response ")
 	}
 	return decodedResponse.Data, nil
 }
