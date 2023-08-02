@@ -10,50 +10,50 @@ import (
 	"github.com/pkg/errors"
 	"gitlab.com/distributed_lab/logan/v3"
 	"net/http"
-	"sync"
-	"time"
 )
 
 type Handler interface {
 	Run()
 	InitListeners() error
-	healthCheck() error
+	healthCheck()
 	getContractsAddresses() ([]rarimo.Data, error)
 	prepareNewListener(network string, address string) (listener.Listener, error)
 	addNewListener(listener listener.Listener)
 }
 
-type ListenerHandler struct { //todo  rename
-	Listeners       []listener.Listener
-	ctx             context.Context
-	log             *logan.Entry
-	pauseTime       int
-	healthCheckTime int64
-	rarimoAPI       string
-	networker       []config.NetInfo
-	masterQ         data.MasterQ
-}
-
 func NewHandler(log *logan.Entry, networker []config.NetInfo, api string, masterQ data.MasterQ) Handler {
 	return &ListenerHandler{
-		Listeners: make([]listener.Listener, 0),
+		Listeners: NewCounters(),
 		ctx:       context.Background(),
 		log:       log,
-		networker: networker,
-		//todo add time config
-		pauseTime: 2,
+		Networker: networker,
+		pauseTime: 2, //todo  remove magic number
 		rarimoAPI: api,
 		masterQ:   masterQ,
 	}
 }
 
 func (h *ListenerHandler) Run() {
-	wg := new(sync.WaitGroup)
-	for _, l := range h.Listeners { // todo  make better name
-		wg.Add(1)
-		go l.Run(wg)
+	go h.healthCheck()
+
+	for {
+		for l, status := range h.Listeners.data { // todo make better name
+			if !status {
+				go l.Run()
+				h.Listeners.Store(l, true)
+			}
+		}
 	}
-	wg.Wait()
+
+}
+
+func (h *ListenerHandler) healthCheck() {
+	for {
+		select {
+		case chanStatus := <-h.healthCheckChan:
+			h.Listeners.Store(h.findByNetwork(chanStatus.Name), false)
+		}
+	}
 }
 
 func (h *ListenerHandler) InitListeners() error {
@@ -70,23 +70,6 @@ func (h *ListenerHandler) InitListeners() error {
 
 		h.addNewListener(preparedListener)
 	}
-	return nil
-}
-
-func (h *ListenerHandler) healthCheck() error {
-	ticker := time.NewTicker(time.Duration(h.healthCheckTime) * time.Second)
-
-	select {
-	case <-ticker.C:
-		for _, l := range h.Listeners {
-			if err := l.HealthCheck(); err != nil {
-				return errors.Wrap(err, "failed to check health")
-			}
-		}
-		ticker.Reset(time.Duration(h.healthCheckTime) * time.Second)
-	default:
-	}
-
 	return nil
 }
 
@@ -123,12 +106,21 @@ func (h *ListenerHandler) prepareNewListener(network string, address string) (li
 	return listener.NewListener(h.log, h.pauseTime, info, h.masterQ), nil
 }
 
+func (h *ListenerHandler) findByNetwork(network string) listener.Listener {
+	for l := range h.Listeners.data {
+		if l.GetNetwork() == network {
+			return l
+		}
+	}
+	return nil
+}
+
 func (h *ListenerHandler) addNewListener(listener listener.Listener) {
-	h.Listeners = append(h.Listeners, listener)
+	h.Listeners.Store(listener, false)
 }
 
 func (h *ListenerHandler) findNetwork(network string) *config.NetInfo {
-	for _, l := range h.networker {
+	for _, l := range h.Networker {
 		if l.Name == network {
 			return &l
 		}

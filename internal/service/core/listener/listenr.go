@@ -11,13 +11,13 @@ import (
 	"github.com/pkg/errors"
 	"gitlab.com/distributed_lab/logan/v3"
 	"log"
-	"sync"
 	"time"
 )
 
 type Listener interface {
-	Run(wg *sync.WaitGroup) error
+	Run() error
 	HealthCheck() error
+	GetNetwork() string
 	decodeData(log types.Log) []byte
 	filterByMetaData(logs []types.Log) []types.Log
 }
@@ -51,9 +51,8 @@ func NewListener(log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.
 	}
 }
 
-func (l *ListenData) Run(wg *sync.WaitGroup) error {
+func (l *ListenData) Run() error {
 	l.isActive = true
-	defer wg.Done()
 
 	client, err := ethclient.Dial(l.rpc)
 	if err != nil {
@@ -115,6 +114,10 @@ func (l *ListenData) HealthCheck() error {
 	}
 
 	return nil
+}
+
+func (l *ListenData) GetNetwork() string {
+	return l.id
 }
 
 func (l *ListenData) filterByMetaData(logs []types.Log) []types.Log {
