@@ -17,7 +17,7 @@ func GetTxLists(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	txs, err := MasterQ(r).TransactionsQ().FilterByAddress(req.Address).Select()
+	txs, err := MasterQ(r).TransactionsQ().New().FilterByAddress(req.Address).Select()
 	if err != nil {
 		Log(r).WithError(err).Error("failed to select txs by address")
 		ape.RenderErr(w, problems.InternalError())
