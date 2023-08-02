@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/dl-only-tokens/back-listener/internal/config"
+	"github.com/dl-only-tokens/back-listener/internal/data"
 	"github.com/dl-only-tokens/back-listener/internal/service/core/listener"
 	"github.com/dl-only-tokens/back-listener/internal/service/core/rarimo"
 	"github.com/pkg/errors"
@@ -30,9 +31,10 @@ type ListenerHandler struct { //todo  rename
 	healthCheckTime int64
 	rarimoAPI       string
 	networker       []config.NetInfo
+	masterQ         data.MasterQ
 }
 
-func NewHandler(log *logan.Entry, networker []config.NetInfo, api string) Handler {
+func NewHandler(log *logan.Entry, networker []config.NetInfo, api string, masterQ data.MasterQ) Handler {
 	return &ListenerHandler{
 		Listeners: make([]listener.Listener, 0),
 		ctx:       context.Background(),
@@ -41,6 +43,7 @@ func NewHandler(log *logan.Entry, networker []config.NetInfo, api string) Handle
 		//todo add time config
 		pauseTime: 2,
 		rarimoAPI: api,
+		masterQ:   masterQ,
 	}
 }
 
@@ -59,9 +62,9 @@ func (h *ListenerHandler) InitListeners() error {
 		return errors.Wrap(err, "failed to get contract list")
 	}
 	for _, network := range networks {
-		preparedListener, err := h.prepareNewListener(network.Attributes.Name, network.Attributes.BridgeContract) //todo pass map from  config
+		preparedListener, err := h.prepareNewListener(network.Attributes.Name, network.Attributes.BridgeContract)
 		if err != nil {
-			//return errors.Wrap(err, "failed to prepare new  listener")
+			h.log.WithError(err).Error("failed to  connect to  rpc")
 			continue
 		}
 
@@ -117,7 +120,7 @@ func (h *ListenerHandler) prepareNewListener(network string, address string) (li
 		NetworkName: network,
 	}
 
-	return listener.NewListener(h.log, h.pauseTime, info), nil
+	return listener.NewListener(h.log, h.pauseTime, info, h.masterQ), nil
 }
 
 func (h *ListenerHandler) addNewListener(listener listener.Listener) {

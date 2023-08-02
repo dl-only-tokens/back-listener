@@ -3,7 +3,7 @@ log:
   disable_sentry: true
 
 db:
-  url: db_url
+  url: postgres://postgres:password@localhost:5432/listener?sslmode=disable
 
 listener:
   addr: :8000

@@ -3,6 +3,7 @@ package listener
 import (
 	"context"
 	"fmt"
+	"github.com/dl-only-tokens/back-listener/internal/data"
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -29,6 +30,7 @@ type ListenData struct {
 	isActive  bool
 	rpc       string
 	address   string
+	masterQ   data.MasterQ
 }
 
 type EthInfo struct {
@@ -37,7 +39,7 @@ type EthInfo struct {
 	NetworkName string
 }
 
-func NewListener(log *logan.Entry, pauseTime int, ethInfo EthInfo) Listener {
+func NewListener(log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.MasterQ) Listener {
 	return &ListenData{
 		id:        ethInfo.NetworkName,
 		log:       log,
@@ -45,8 +47,7 @@ func NewListener(log *logan.Entry, pauseTime int, ethInfo EthInfo) Listener {
 		ctx:       context.Background(),
 		rpc:       ethInfo.RPC,
 		address:   ethInfo.Address,
-
-		//masterQ
+		masterQ:   masterQ,
 	}
 }
 
@@ -59,7 +60,6 @@ func (l *ListenData) Run(wg *sync.WaitGroup) error {
 		return errors.Wrap(err, "failed to connect to node")
 	}
 
-	//todo get list  of addresses from api and look  for this networks on the config
 	contractAddress := common.HexToAddress(l.address)
 	if err != nil {
 		return errors.Wrap(err, "failed to prepare address")
@@ -99,6 +99,10 @@ func (l *ListenData) Run(wg *sync.WaitGroup) error {
 			sub = l.filterByMetaData(sub)
 
 			l.log.Info(fmt.Sprintf("id: %s  %s", l.id, sub))
+
+			if err := l.masterQ.Transaction(l.insertTxs, l.prepareDataToInsert(sub)); err != nil {
+				return errors.Wrap(err, "failed to use transaction")
+			}
 			break
 		}
 
@@ -122,7 +126,42 @@ func (l *ListenData) filterByMetaData(logs []types.Log) []types.Log {
 }
 
 func (l *ListenData) decodeData(log types.Log) []byte {
-	//todo  update it
-	//log.Data
+	//todo  implement decoder
 	return log.Data
+}
+
+func (l *ListenData) prepareDataToInsert(logs []types.Log) []data.Transactions {
+	response := make([]data.Transactions, 0)
+	for _, event := range logs {
+		response = append(response,
+			data.Transactions{
+				PaymentID: "",
+				Recipient: event.Address.Hex(),
+				TxHash:    event.TxHash.String(),
+				Network:   l.id,
+			})
+	}
+
+	return response
+}
+
+func (l *ListenData) insertTxs(any interface{}) error {
+	txs, err := l.interfaceToTx(any)
+	if err != nil {
+		return errors.Wrap(err, "failed tom decode data")
+	}
+	for _, tx := range *txs {
+		if err := l.masterQ.TransactionsQ().New().Insert(&tx); err != nil {
+			return errors.Wrap(err, "failed to  insert tx to db")
+		}
+	}
+	return nil
+}
+
+func (l *ListenData) interfaceToTx(any interface{}) (*[]data.Transactions, error) {
+	if convertedData, ok := any.([]data.Transactions); ok {
+		return &convertedData, nil
+	}
+
+	return nil, errors.New("data cant be converted to KYCWebhookResponse")
 }

@@ -1,0 +1,15 @@
+type: object
+required:
+  - payment_id
+  - tx_hash
+  - recipient
+  - network
+properties:
+  payment_id:
+    type: string
+  recipient:
+    type: string
+  tx_hash:
+    type: string
+  network:
+    type: string

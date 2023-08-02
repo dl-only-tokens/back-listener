@@ -1,6 +1,7 @@
 package api
 
 import (
+	"github.com/dl-only-tokens/back-listener/internal/data/pg"
 	"github.com/dl-only-tokens/back-listener/internal/service/core/handler"
 	"gitlab.com/distributed_lab/logan/v3"
 	"net"
@@ -23,7 +24,7 @@ func (s *service) run() error {
 
 	r := s.router()
 	/////////////////
-	listenHandler := handler.NewHandler(s.log, s.cfg.Network().NetInfoList, s.cfg.API().Endpoint)
+	listenHandler := handler.NewHandler(s.log, s.cfg.Network().NetInfoList, s.cfg.API().Endpoint, pg.NewMasterQ(s.cfg.DB()))
 
 	if err := listenHandler.InitListeners(); err != nil {
 		return errors.Wrap(err, "failed to init listeners")
