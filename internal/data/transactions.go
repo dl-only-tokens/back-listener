@@ -11,9 +11,10 @@ type TransactionsQ interface {
 }
 
 type Transactions struct {
-	ID        int64  `db:"id" struct:"-"`
-	PaymentID string `db:"payment_id" structs:"payment_id"`
-	Recipient string `db:"recipient" structs:"recipient"`
-	TxHash    string `db:"tx_hash" structs:"tx_hash"`
-	Network   string `db:"network" structs:"network"`
+	ID          int64  `db:"id" struct:"-"`
+	PaymentID   string `db:"payment_id" structs:"payment_id"`
+	NetworkFrom string `db:"network_from" structs:"network_from"`
+	TxHash      string `db:"tx_hash" structs:"tx_hash"`
+	NetworkTo   string `db:"network_to" structs:"network_to"`
+	Network     string `db:"network" structs:"network"`
 }

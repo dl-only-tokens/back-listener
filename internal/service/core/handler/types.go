@@ -14,7 +14,7 @@ const (
 
 type ListenerHandler struct { //todo  rename
 	Listeners       *ListenersMap
-	Networker       []config.NetInfo
+	supportNetworks []config.NetInfo
 	ctx             context.Context
 	test            sync.Map
 	log             *logan.Entry

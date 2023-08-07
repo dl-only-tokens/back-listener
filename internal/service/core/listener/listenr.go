@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"gitlab.com/distributed_lab/logan/v3"
 	"log"
+	"strings"
 	"time"
 )
 
@@ -19,8 +20,6 @@ type Listener interface {
 	Run() error
 	HealthCheck() error
 	GetNetwork() string
-	decodeData(log types.Log) []byte
-	filterByMetaData(logs []types.Log) []types.Log
 }
 
 type ListenData struct {
@@ -97,26 +96,55 @@ func (l *ListenData) Run() error {
 				return errors.Wrap(err, "failed to filter logs ")
 			}
 
-			//sub = l.filterByMetaData(sub)
-			//
 			l.log.Info(fmt.Sprintf("id: %s  %s", l.id, logs))
 
-			l.getTxIntputsOnBlock(l.GetTxHashes(logs), block)
-
-			if err := l.masterQ.Transaction(l.insertTxs, l.prepareDataToInsert(logs)); err != nil {
+			if err = l.masterQ.Transaction(l.insertTxs, l.prepareDataToInsert(l.getTxIntputsOnBlock(l.GetTxHashes(logs), block))); err != nil {
 				return errors.Wrap(err, "failed to use transaction")
 			}
+
 			break
 		}
 
 	}
 }
 
-func (l *ListenData) getTxIntputsOnBlock(txHashes []common.Hash, block *types.Block) {
+func (l *ListenData) getTxIntputsOnBlock(txHashes []common.Hash, block *types.Block) map[string][]string {
+	result := make(map[string][]string)
+
 	for _, txHash := range txHashes {
 		tx := block.Transaction(txHash)
 		l.log.Debug(hex.EncodeToString(tx.Data()))
+
+		parsedData, err := l.parsePailoaderOnInput(hex.EncodeToString(tx.Data()), "") //todo header
+		if err != nil {
+			return nil
+		}
+		result[tx.Hash().String()] = parsedData
 	}
+	return result
+}
+
+func (l *ListenData) parsePailoaderOnInput(input string, header string) ([]string, error) { //move to  another class
+	index := strings.Index(input, header)
+	if index == -1 {
+		return nil, errors.New("failed to found substring")
+	}
+	hexBytes, err := hex.DecodeString(input[index:])
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode string")
+	}
+
+	index = strings.Index(string(hexBytes), ".") //todo modify it
+	if index == -1 {
+		return nil, errors.New("failed to found substring")
+	}
+
+	hexBytes, err = hex.DecodeString(string(hexBytes[:index]))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decode string")
+	}
+
+	return strings.Split(string(hexBytes), ":"), nil
 }
 
 func (l *ListenData) GetTxHashes(logs []types.Log) []common.Hash {
@@ -140,31 +168,16 @@ func (l *ListenData) GetNetwork() string {
 	return l.id
 }
 
-func (l *ListenData) filterByMetaData(logs []types.Log) []types.Log {
-	for _, event := range logs {
-		//todo  decode data and  filter its
-		//l.log.Debug(event.Topics)
-		//l.log.Debug(hex.EncodeToString(event.Data))
-
-		l.decodeData(event)
-	}
-	return logs
-}
-
-func (l *ListenData) decodeData(log types.Log) []byte {
-	//todo  implement decoder
-	return log.Data
-}
-
-func (l *ListenData) prepareDataToInsert(logs []types.Log) []data.Transactions {
+func (l *ListenData) prepareDataToInsert(inputs map[string][]string) []data.Transactions {
 	response := make([]data.Transactions, 0)
-	for _, event := range logs {
+	for txHash, payload := range inputs {
 		response = append(response,
 			data.Transactions{
-				PaymentID: "",
-				Recipient: event.Address.Hex(),
-				TxHash:    event.TxHash.String(),
-				Network:   l.id,
+				PaymentID:   payload[1],
+				NetworkFrom: payload[2],
+				NetworkTo:   payload[3],
+				TxHash:      txHash,
+				Network:     l.id,
 			})
 	}
 

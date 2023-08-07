@@ -24,14 +24,14 @@ type Handler interface {
 
 func NewHandler(log *logan.Entry, networker []config.NetInfo, rarimoApi *config.API, masterQ data.MasterQ) Handler {
 	return &ListenerHandler{
-		Listeners:  NewCounters(),
-		ctx:        context.Background(),
-		log:        log,
-		Networker:  networker,
-		pauseTime:  2, //todo  remove magic number
-		rarimoAPI:  rarimoApi.Endpoint,
-		masterQ:    masterQ,
-		isAutoInit: rarimoApi.IsAutoInit,
+		Listeners:       NewCounters(),
+		ctx:             context.Background(),
+		log:             log,
+		supportNetworks: networker,
+		pauseTime:       2, //todo  remove magic number
+		rarimoAPI:       rarimoApi.Endpoint,
+		masterQ:         masterQ,
+		isAutoInit:      rarimoApi.IsAutoInit,
 	}
 }
 
@@ -58,7 +58,7 @@ func (h *ListenerHandler) Init() error {
 		return nil
 	}
 
-	if err := h.initListeners(h.Networker); err != nil {
+	if err := h.initListeners(h.supportNetworks); err != nil {
 		return errors.Wrap(err, "failed to do auto  init")
 	}
 
@@ -135,7 +135,7 @@ func (h *ListenerHandler) addNewListener(listener listener.Listener) {
 }
 
 func (h *ListenerHandler) findNetwork(network string) *config.NetInfo {
-	for _, l := range h.Networker {
+	for _, l := range h.supportNetworks {
 		if l.Name == network {
 			return &l
 		}
