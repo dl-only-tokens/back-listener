@@ -2,34 +2,36 @@ package handler
 
 import (
 	"context"
-	"encoding/json"
 	"github.com/dl-only-tokens/back-listener/internal/config"
 	"github.com/dl-only-tokens/back-listener/internal/data"
 	"github.com/dl-only-tokens/back-listener/internal/service/core/listener"
 	"github.com/dl-only-tokens/back-listener/internal/service/core/rarimo"
 	"github.com/pkg/errors"
 	"gitlab.com/distributed_lab/logan/v3"
-	"net/http"
 )
 
 type Handler interface {
 	Run()
-	InitListeners() error
+	Init() error
 	healthCheck()
-	getContractsAddresses() ([]rarimo.Data, error)
+	autoInitContracts() error
+	initListeners(data []config.NetInfo) error
+	findByNetwork(network string) listener.Listener
 	prepareNewListener(network string, address string) (listener.Listener, error)
 	addNewListener(listener listener.Listener)
+	findNetwork(network string) *config.NetInfo
 }
 
-func NewHandler(log *logan.Entry, networker []config.NetInfo, api string, masterQ data.MasterQ) Handler {
+func NewHandler(log *logan.Entry, networker []config.NetInfo, rarimoApi *config.API, masterQ data.MasterQ) Handler {
 	return &ListenerHandler{
-		Listeners: NewCounters(),
-		ctx:       context.Background(),
-		log:       log,
-		Networker: networker,
-		pauseTime: 2, //todo  remove magic number
-		rarimoAPI: api,
-		masterQ:   masterQ,
+		Listeners:  NewCounters(),
+		ctx:        context.Background(),
+		log:        log,
+		Networker:  networker,
+		pauseTime:  2, //todo  remove magic number
+		rarimoAPI:  rarimoApi.Endpoint,
+		masterQ:    masterQ,
+		isAutoInit: rarimoApi.IsAutoInit,
 	}
 }
 
@@ -47,24 +49,42 @@ func (h *ListenerHandler) Run() {
 
 }
 
-func (h *ListenerHandler) healthCheck() {
-	for {
-		select {
-		case chanStatus := <-h.healthCheckChan:
-			h.Listeners.Store(h.findByNetwork(chanStatus.Name), false)
+func (h *ListenerHandler) Init() error {
+
+	if h.isAutoInit {
+		if err := h.autoInitContracts(); err != nil {
+			return errors.Wrap(err, "failed to do auto  init")
 		}
+		return nil
 	}
+
+	if err := h.initListeners(h.Networker); err != nil {
+		return errors.Wrap(err, "failed to do auto  init")
+	}
+
+	return nil
+
 }
 
-func (h *ListenerHandler) InitListeners() error {
-	networks, err := h.getContractsAddresses()
+func (h *ListenerHandler) autoInitContracts() error {
+	rarimoHandler := rarimo.NewRarimoHandler(h.rarimoAPI)
+	networks, err := rarimoHandler.GetContractsAddresses()
 	if err != nil {
 		return errors.Wrap(err, "failed to get contract list")
 	}
-	for _, network := range networks {
-		preparedListener, err := h.prepareNewListener(network.Attributes.Name, network.Attributes.BridgeContract)
+
+	if err = h.initListeners(networks); err != nil {
+		return errors.Wrap(err, "failed to initListeners")
+	}
+
+	return nil
+}
+
+func (h *ListenerHandler) initListeners(data []config.NetInfo) error {
+	for _, network := range data {
+		preparedListener, err := h.prepareNewListener(network.Name, network.Address)
 		if err != nil {
-			h.log.WithError(err).Error("failed to  connect to  rpc")
+			h.log.WithError(err).Error("failed to connect to  rpc")
 			continue
 		}
 
@@ -73,28 +93,14 @@ func (h *ListenerHandler) InitListeners() error {
 	return nil
 }
 
-func (h *ListenerHandler) getContractsAddresses() ([]rarimo.Data, error) {
-	resp, err := http.Get(h.rarimoAPI)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to send request")
-	}
-
-	if resp.StatusCode >= 300 && resp.StatusCode < 500 {
-		return nil, errors.New("bad response code")
-	}
-
-	decodedResponse := new(rarimo.NetworkListResponse)
-
-	if err := json.NewDecoder(resp.Body).Decode(&decodedResponse); err != nil {
-		return nil, errors.New("failed to decode response ")
-	}
-	return decodedResponse.Data, nil
-}
-
 func (h *ListenerHandler) prepareNewListener(network string, address string) (listener.Listener, error) {
 	netInfo := h.findNetwork(network)
 	if netInfo == nil {
 		return nil, errors.New("unsupported network")
+	}
+
+	if len(address) == 0 {
+		return nil, errors.New("address is empty")
 	}
 
 	info := listener.EthInfo{
@@ -104,6 +110,15 @@ func (h *ListenerHandler) prepareNewListener(network string, address string) (li
 	}
 
 	return listener.NewListener(h.log, h.pauseTime, info, h.masterQ), nil
+}
+
+func (h *ListenerHandler) healthCheck() {
+	for {
+		select {
+		case chanStatus := <-h.healthCheckChan:
+			h.Listeners.Store(h.findByNetwork(chanStatus.Name), false)
+		}
+	}
 }
 
 func (h *ListenerHandler) findByNetwork(network string) listener.Listener {

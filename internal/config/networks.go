@@ -16,8 +16,9 @@ type Network struct {
 }
 
 type NetInfo struct {
-	Name string `fig:"name"`
-	Rpc  string `fig:"rpc"`
+	Name    string `fig:"name"`
+	Address string `fig:"address"`
+	Rpc     string `fig:"rpc"`
 }
 
 func NewNetworkConfiger(getter kv.Getter) NetworkConfiger {

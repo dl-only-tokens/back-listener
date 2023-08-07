@@ -12,7 +12,8 @@ type APIConfiger interface {
 }
 
 type API struct {
-	Endpoint string `fig:"endpoint"`
+	Endpoint   string `fig:"endpoint"`
+	IsAutoInit bool   `fig:"auto_init"`
 }
 
 func NewAPIConfiger(getter kv.Getter) APIConfiger {

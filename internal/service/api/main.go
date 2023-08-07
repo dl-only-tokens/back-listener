@@ -24,9 +24,9 @@ func (s *service) run() error {
 
 	r := s.router()
 	/////////////////
-	listenHandler := handler.NewHandler(s.log, s.cfg.Network().NetInfoList, s.cfg.API().Endpoint, pg.NewMasterQ(s.cfg.DB()))
+	listenHandler := handler.NewHandler(s.log, s.cfg.Network().NetInfoList, s.cfg.API(), pg.NewMasterQ(s.cfg.DB()))
 
-	if err := listenHandler.InitListeners(); err != nil {
+	if err := listenHandler.Init(); err != nil {
 		return errors.Wrap(err, "failed to init listeners")
 	}
 	go listenHandler.Run()

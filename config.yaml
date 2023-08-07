@@ -16,9 +16,16 @@ networks:
       rpc: "https://polygon-mainnet.infura.io/v3/5afc5eb6b4424ad39f8c0db22125074a"
     - name: 'Avalanche'
       rpc: "https://avalanche-mainnet.infura.io/v3/5afc5eb6b4424ad39f8c0db22125074a"
-
+    - name: 'Georly'
+      address: "0x07865c6e87b9f70255377e024ace6630c1eaa37f"
+      rpc:  "https://goerli.infura.io/v3/5afc5eb6b4424ad39f8c0db22125074a"
 api:
   endpoint: "https://api.rarify.tokend.io/v1/chains"
+  auto_init: false
+
+tx_wrapper:
+  header: 66613161666237613a
+#  header_string: "fa1afb7a:"
 
 
 cop:

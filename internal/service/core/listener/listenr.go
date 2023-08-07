@@ -2,6 +2,7 @@ package listener
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"github.com/dl-only-tokens/back-listener/internal/data"
 	"github.com/ethereum/go-ethereum"
@@ -78,6 +79,7 @@ func (l *ListenData) Run() error {
 			if err != nil {
 				return errors.Wrap(err, "failed to get last block ")
 			}
+
 			hash := block.Hash()
 
 			if previewHash == hash {
@@ -90,22 +92,40 @@ func (l *ListenData) Run() error {
 			}
 			previewHash = hash
 
-			sub, err := client.FilterLogs(context.Background(), query)
+			logs, err := client.FilterLogs(context.Background(), query)
 			if err != nil {
 				return errors.Wrap(err, "failed to filter logs ")
 			}
 
-			sub = l.filterByMetaData(sub)
+			//sub = l.filterByMetaData(sub)
+			//
+			l.log.Info(fmt.Sprintf("id: %s  %s", l.id, logs))
 
-			l.log.Info(fmt.Sprintf("id: %s  %s", l.id, sub))
+			l.getTxIntputsOnBlock(l.GetTxHashes(logs), block)
 
-			if err := l.masterQ.Transaction(l.insertTxs, l.prepareDataToInsert(sub)); err != nil {
+			if err := l.masterQ.Transaction(l.insertTxs, l.prepareDataToInsert(logs)); err != nil {
 				return errors.Wrap(err, "failed to use transaction")
 			}
 			break
 		}
 
 	}
+}
+
+func (l *ListenData) getTxIntputsOnBlock(txHashes []common.Hash, block *types.Block) {
+	for _, txHash := range txHashes {
+		tx := block.Transaction(txHash)
+		l.log.Debug(hex.EncodeToString(tx.Data()))
+	}
+}
+
+func (l *ListenData) GetTxHashes(logs []types.Log) []common.Hash {
+	result := make([]common.Hash, 0)
+	for _, event := range logs {
+		result = append(result, event.TxHash)
+	}
+
+	return result
 }
 
 func (l *ListenData) HealthCheck() error {
@@ -121,9 +141,12 @@ func (l *ListenData) GetNetwork() string {
 }
 
 func (l *ListenData) filterByMetaData(logs []types.Log) []types.Log {
-	for _, log := range logs {
+	for _, event := range logs {
 		//todo  decode data and  filter its
-		l.decodeData(log)
+		//l.log.Debug(event.Topics)
+		//l.log.Debug(hex.EncodeToString(event.Data))
+
+		l.decodeData(event)
 	}
 	return logs
 }

@@ -22,6 +22,7 @@ type ListenerHandler struct { //todo  rename
 	healthCheckChan chan StateInfo
 	rarimoAPI       string
 	masterQ         data.MasterQ
+	isAutoInit      bool
 }
 
 type StateInfo struct {
