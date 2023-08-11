@@ -1,36 +1,38 @@
 package listener
 
 import (
+	"bytes"
 	"context"
 	"encoding/hex"
-	"fmt"
+	"github.com/dl-only-tokens/back-listener/internal/config"
 	"github.com/dl-only-tokens/back-listener/internal/data"
 	"github.com/ethereum/go-ethereum"
+	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/pkg/errors"
 	"gitlab.com/distributed_lab/logan/v3"
-	"log"
+	"os"
 	"strings"
 	"time"
 )
 
 type Listener interface {
-	Run() error
-	HealthCheck() error
+	Run()
 	GetNetwork() string
 }
 
 type ListenData struct {
-	id        string
-	log       *logan.Entry
-	pauseTime int
-	ctx       context.Context
-	isActive  bool
-	rpc       string
-	address   string
-	masterQ   data.MasterQ
+	id              string
+	log             *logan.Entry
+	pauseTime       int
+	ctx             context.Context
+	rpc             string
+	address         string
+	masterQ         data.MasterQ
+	txMetaData      *config.MetaData
+	healthCheckChan chan StateInfo
 }
 
 type EthInfo struct {
@@ -39,29 +41,32 @@ type EthInfo struct {
 	NetworkName string
 }
 
-func NewListener(log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.MasterQ) Listener {
+func NewListener(log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.MasterQ, metaData *config.MetaData, healthCheckChan chan StateInfo) Listener {
 	return &ListenData{
-		id:        ethInfo.NetworkName,
-		log:       log,
-		pauseTime: pauseTime,
-		ctx:       context.Background(),
-		rpc:       ethInfo.RPC,
-		address:   ethInfo.Address,
-		masterQ:   masterQ,
+		id:              ethInfo.NetworkName,
+		log:             log,
+		pauseTime:       pauseTime,
+		ctx:             context.Background(),
+		rpc:             ethInfo.RPC,
+		address:         ethInfo.Address,
+		masterQ:         masterQ,
+		txMetaData:      metaData,
+		healthCheckChan: healthCheckChan,
 	}
 }
 
-func (l *ListenData) Run() error {
-	l.isActive = true
-
+func (l *ListenData) Run() {
 	client, err := ethclient.Dial(l.rpc)
 	if err != nil {
-		return errors.Wrap(err, "failed to connect to node")
+
+		l.log.WithError(err).Error("failed to connect to node")
+		return
 	}
 
 	contractAddress := common.HexToAddress(l.address)
 	if err != nil {
-		return errors.Wrap(err, "failed to prepare address")
+		l.log.WithError(err).Error("failed to prepare address")
+		return
 	}
 
 	var previewHash common.Hash
@@ -70,21 +75,21 @@ func (l *ListenData) Run() error {
 	for {
 		select {
 		case <-l.ctx.Done():
-			l.isActive = false
-			return nil
+			l.healthCheckChan <- StateInfo{
+				Name: l.id,
+			}
+			return
 		case <-ticker.C:
-			//todo move to external  func
 			block, err := client.BlockByNumber(context.Background(), nil)
 			if err != nil {
-				return errors.Wrap(err, "failed to get last block ")
+				l.log.WithError(err).Error("failed to get last block ")
+				return
 			}
 
 			hash := block.Hash()
-
 			if previewHash == hash {
 				continue
 			}
-			log.Println("--------------------------------------------") //todo  remove  it
 			query := ethereum.FilterQuery{
 				BlockHash: &hash,
 				Addresses: []common.Address{contractAddress},
@@ -93,13 +98,17 @@ func (l *ListenData) Run() error {
 
 			logs, err := client.FilterLogs(context.Background(), query)
 			if err != nil {
-				return errors.Wrap(err, "failed to filter logs ")
+				continue
 			}
 
-			l.log.Info(fmt.Sprintf("id: %s  %s", l.id, logs))
-
-			if err = l.masterQ.Transaction(l.insertTxs, l.prepareDataToInsert(l.getTxIntputsOnBlock(l.GetTxHashes(logs), block))); err != nil {
-				return errors.Wrap(err, "failed to use transaction")
+			suitableTXs, err := l.parseRecipientFromEvent(logs)
+			if err != nil {
+				l.log.WithError(err).Error("failed to  get suitable")
+				continue
+			}
+			if err = l.insertTxs(l.prepareDataToInsert(l.getTxIntputsOnBlock(suitableTXs, block))); err != nil {
+				l.log.Error(errors.Wrap(err, "failed to use transaction"))
+				continue
 			}
 
 			break
@@ -108,43 +117,44 @@ func (l *ListenData) Run() error {
 	}
 }
 
-func (l *ListenData) getTxIntputsOnBlock(txHashes []common.Hash, block *types.Block) map[string][]string {
+func (l *ListenData) getTxIntputsOnBlock(txHashes []RecipientInfo, block *types.Block) map[string][]string {
 	result := make(map[string][]string)
 
-	for _, txHash := range txHashes {
-		tx := block.Transaction(txHash)
+	for _, info := range txHashes {
+		tx := block.Transaction(info.TxHash)
 		l.log.Debug(hex.EncodeToString(tx.Data()))
 
-		parsedData, err := l.parsePailoaderOnInput(hex.EncodeToString(tx.Data()), "") //todo header
+		parsedData, err := l.parsePayloadOnInput(hex.EncodeToString(tx.Data()), l.txMetaData.Header, l.txMetaData.Footer) //todo header
 		if err != nil {
 			return nil
 		}
-		result[tx.Hash().String()] = parsedData
+
+		result[tx.Hash().String()] = append(parsedData, info.Recipient)
 	}
+
 	return result
 }
 
-func (l *ListenData) parsePailoaderOnInput(input string, header string) ([]string, error) { //move to  another class
+func (l *ListenData) parsePayloadOnInput(input string, header string, footer string) ([]string, error) { //move to  another class
 	index := strings.Index(input, header)
 	if index == -1 {
 		return nil, errors.New("failed to found substring")
 	}
-	hexBytes, err := hex.DecodeString(input[index:])
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode string")
-	}
 
-	index = strings.Index(string(hexBytes), ".") //todo modify it
+	input = input[index:]
+	index = strings.Index(input, footer)
 	if index == -1 {
 		return nil, errors.New("failed to found substring")
 	}
 
-	hexBytes, err = hex.DecodeString(string(hexBytes[:index]))
+	hexBytes, err := hex.DecodeString(input[:index])
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decode string")
 	}
 
-	return strings.Split(string(hexBytes), ":"), nil
+	decodedString := string(hexBytes)
+
+	return strings.Split(decodedString, ":"), nil
 }
 
 func (l *ListenData) GetTxHashes(logs []types.Log) []common.Hash {
@@ -156,14 +166,6 @@ func (l *ListenData) GetTxHashes(logs []types.Log) []common.Hash {
 	return result
 }
 
-func (l *ListenData) HealthCheck() error {
-	if !l.isActive {
-		return errors.New("lister isn't active")
-	}
-
-	return nil
-}
-
 func (l *ListenData) GetNetwork() string {
 	return l.id
 }
@@ -171,13 +173,14 @@ func (l *ListenData) GetNetwork() string {
 func (l *ListenData) prepareDataToInsert(inputs map[string][]string) []data.Transactions {
 	response := make([]data.Transactions, 0)
 	for txHash, payload := range inputs {
+
 		response = append(response,
 			data.Transactions{
 				PaymentID:   payload[1],
 				NetworkFrom: payload[2],
 				NetworkTo:   payload[3],
+				Recipient:   payload[4],
 				TxHash:      txHash,
-				Network:     l.id,
 			})
 	}
 
@@ -202,5 +205,38 @@ func (l *ListenData) interfaceToTx(any interface{}) (*[]data.Transactions, error
 		return &convertedData, nil
 	}
 
-	return nil, errors.New("data cant be converted to KYCWebhookResponse")
+	return nil, errors.New("data cant be converted to TX")
+}
+
+func (l *ListenData) parseRecipientFromEvent(events []types.Log) ([]RecipientInfo, error) {
+	result := make([]RecipientInfo, 0)
+
+	abiBytes, err := os.ReadFile("./internal/contract/erc20/erc20.abi") //todo config
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to read file ")
+	}
+
+	contractAbi, err := abi.JSON(bytes.NewReader(abiBytes))
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to  parse  abi ")
+	}
+
+	for _, vLog := range events {
+		event, err := contractAbi.Unpack("DepositedERC20", vLog.Data)
+		if err != nil {
+			l.log.WithError(err).Error("failed to unpack abi")
+			continue
+		}
+		if len(event) < 6 {
+			l.log.Error("event too short")
+			continue
+		}
+
+		result = append(result, RecipientInfo{
+			Recipient: event[5].(string),
+			TxHash:    vLog.TxHash,
+		})
+	}
+
+	return result, nil
 }

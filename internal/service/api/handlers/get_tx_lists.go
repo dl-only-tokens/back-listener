@@ -36,10 +36,9 @@ func prepareResponse(txs []data.Transactions) resources.GetTxListResponse {
 	txBlobs := make([]resources.TxBlob, 0)
 	for _, tx := range txs {
 		blob := resources.TxBlob{
-			Network:   tx.Network,
 			PaymentId: tx.PaymentID,
-			//Recipient: tx.Recipient,
-			TxHash: tx.TxHash,
+			Recipient: tx.Recipient,
+			TxHash:    tx.TxHash,
 		}
 		txBlobs = append(txBlobs, blob)
 	}

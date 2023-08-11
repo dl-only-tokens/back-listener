@@ -23,14 +23,11 @@ func (s *service) run() error {
 	s.log.Info("Service started")
 
 	r := s.router()
-	/////////////////
-	listenHandler := handler.NewHandler(s.log, s.cfg.Network().NetInfoList, s.cfg.API(), pg.NewMasterQ(s.cfg.DB()))
-
+	listenHandler := handler.NewHandler(s.log, s.cfg.Network().NetInfoList, s.cfg.API(), pg.NewMasterQ(s.cfg.DB()), s.cfg.MetaData(), s.cfg.ChainListener())
 	if err := listenHandler.Init(); err != nil {
 		return errors.Wrap(err, "failed to init listeners")
 	}
 	go listenHandler.Run()
-	///////////////// todo  make more clear
 	if err := s.copus.RegisterChi(r); err != nil {
 		return errors.Wrap(err, "cop failed")
 	}

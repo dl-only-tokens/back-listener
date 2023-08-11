@@ -16,17 +16,28 @@ networks:
       rpc: "https://polygon-mainnet.infura.io/v3/5afc5eb6b4424ad39f8c0db22125074a"
     - name: 'Avalanche'
       rpc: "https://avalanche-mainnet.infura.io/v3/5afc5eb6b4424ad39f8c0db22125074a"
-    - name: 'Georly'
-      address: "0x07865c6e87b9f70255377e024ace6630c1eaa37f"
+    - name: 'Goerli'
       rpc:  "https://goerli.infura.io/v3/5afc5eb6b4424ad39f8c0db22125074a"
+    - name: 'Sepolia'
+      rpc:  "https://sepolia.infura.io/v3/5afc5eb6b4424ad39f8c0db22125074a"
+    - name: 'BSC Testnet'
+      rpc:  "https://bsc-testnet.publicnode.com"
+
+
 api:
   endpoint: "https://api.rarify.tokend.io/v1/chains"
-  auto_init: false
+  auto_init: true
 
-tx_wrapper:
-  header: 66613161666237613a
-#  header_string: "fa1afb7a:"
+meta_data:
+  header: "66613161666237613a"
+  footer: "3b"
 
+chain_listener:
+  pause_time: 2
+
+#meta_data:
+#  header: "fa1afb7a:"
+#  footer: ";a"
 
 cop:
   disabled: true

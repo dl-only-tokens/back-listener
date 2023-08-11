@@ -22,16 +22,17 @@ type Handler interface {
 	findNetwork(network string) *config.NetInfo
 }
 
-func NewHandler(log *logan.Entry, networker []config.NetInfo, rarimoApi *config.API, masterQ data.MasterQ) Handler {
+func NewHandler(log *logan.Entry, networker []config.NetInfo, rarimoApi *config.API, masterQ data.MasterQ, metaData *config.MetaData, chainListener *config.ChainListener) Handler {
 	return &ListenerHandler{
 		Listeners:       NewCounters(),
 		ctx:             context.Background(),
 		log:             log,
 		supportNetworks: networker,
-		pauseTime:       2, //todo  remove magic number
+		pauseTime:       chainListener.PauseTime,
 		rarimoAPI:       rarimoApi.Endpoint,
 		masterQ:         masterQ,
 		isAutoInit:      rarimoApi.IsAutoInit,
+		txMetaData:      metaData,
 	}
 }
 
@@ -50,7 +51,6 @@ func (h *ListenerHandler) Run() {
 }
 
 func (h *ListenerHandler) Init() error {
-
 	if h.isAutoInit {
 		if err := h.autoInitContracts(); err != nil {
 			return errors.Wrap(err, "failed to do auto  init")
@@ -109,7 +109,7 @@ func (h *ListenerHandler) prepareNewListener(network string, address string) (li
 		NetworkName: network,
 	}
 
-	return listener.NewListener(h.log, h.pauseTime, info, h.masterQ), nil
+	return listener.NewListener(h.log, h.pauseTime, info, h.masterQ, h.txMetaData, h.healthCheckChan), nil
 }
 
 func (h *ListenerHandler) healthCheck() {

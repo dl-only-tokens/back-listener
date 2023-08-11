@@ -13,7 +13,9 @@ type Config interface {
 	pgdb.Databaser
 	types.Copuser
 	NetworkConfiger
+	MetaDataConfiger
 	APIConfiger
+	ChainListenerConfiger
 	comfig.Listenerer
 }
 
@@ -24,17 +26,21 @@ type config struct {
 	comfig.Listenerer
 	NetworkConfiger
 	APIConfiger
+	MetaDataConfiger
+	ChainListenerConfiger
 	getter kv.Getter
 }
 
 func New(getter kv.Getter) Config {
 	return &config{
-		getter:          getter,
-		APIConfiger:     NewAPIConfiger(getter),
-		NetworkConfiger: NewNetworkConfiger(getter),
-		Databaser:       pgdb.NewDatabaser(getter),
-		Copuser:         copus.NewCopuser(getter),
-		Listenerer:      comfig.NewListenerer(getter),
-		Logger:          comfig.NewLogger(getter, comfig.LoggerOpts{}),
+		getter:                getter,
+		MetaDataConfiger:      NewMetaDataConfiger(getter),
+		APIConfiger:           NewAPIConfiger(getter),
+		NetworkConfiger:       NewNetworkConfiger(getter),
+		Databaser:             pgdb.NewDatabaser(getter),
+		Copuser:               copus.NewCopuser(getter),
+		Listenerer:            comfig.NewListenerer(getter),
+		ChainListenerConfiger: NewChainListenerConfiger(getter),
+		Logger:                comfig.NewLogger(getter, comfig.LoggerOpts{}),
 	}
 }

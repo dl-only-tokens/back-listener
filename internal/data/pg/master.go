@@ -12,7 +12,7 @@ type masterQ struct {
 
 func NewMasterQ(db *pgdb.DB) data.MasterQ {
 	return &masterQ{
-		db: db,
+		db: db.Clone(),
 	}
 }
 
@@ -26,7 +26,7 @@ func (q *masterQ) TransactionsQ() data.TransactionsQ {
 
 func (q *masterQ) Transaction(fn func(data interface{}) error, data interface{}) error {
 	return q.db.TransactionWithOptions(&sql.TxOptions{
-		Isolation: sql.LevelSerializable,
+		Isolation: sql.LevelReadCommitted,
 	}, func() error {
 		return fn(data)
 	})

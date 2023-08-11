@@ -48,9 +48,8 @@ func (q *TransactionsQ) Select() ([]data.Transactions, error) {
 
 func (q *TransactionsQ) Insert(value *data.Transactions) error {
 	clauses := structs.Map(value)
-	var id int64
 
-	if err := q.db.Get(&id, sq.Insert(transactionTableName).SetMap(clauses).Suffix("returning id")); err != nil {
+	if err := q.db.Exec(sq.Insert(transactionTableName).SetMap(clauses)); err != nil {
 		return errors.Wrap(err, "failed to insert tx")
 	}
 
