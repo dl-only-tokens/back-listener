@@ -16,18 +16,18 @@ shell:
     - export CGO_ENABLED=0
     - export GO111MODULE=off
     - export GOOS=linux
-    - go build  -o /usr/local/bin/marketplace-v2-svc  /go/src/gitlab.com/tokend/blockparty/marketplace-v2-svc
+    - go build  -o /usr/local/bin/back-listener  /go/src/github.com/dl-only-tokens/back-listener
 
 ---
 image: service
 from: alpine:3.18
 docker:
-  ENTRYPOINT: marketplace-v2-svc
+  ENTRYPOINT: back-listener
 shell:
   setup:
     - apk add --no-cache ca-certificates
 import:
   - image: builder
-    add: /usr/local/bin/marketplace-v2-svc
-    to: /usr/local/bin/marketplace-v2-svc
+    add: /usr/local/bin/back-listener
+    to: /usr/local/bin/back-listener
     after: builder
