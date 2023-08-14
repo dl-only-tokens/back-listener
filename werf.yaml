@@ -2,12 +2,12 @@ configVersion: 1
 project: "backend"
 ---
 image: builder
-from: golang:alpine
+from: golang:1.16.2-stretch
 docker:
   WORKDIR: /go/src/github.com/dl-only-tokens/back-listener
 git:
   - add: /
-    to: /
+    to: /go/src/github.com/dl-only-tokens/back-listener
     stageDependencies:
       setup:
         - "**/*"
