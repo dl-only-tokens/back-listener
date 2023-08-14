@@ -5,8 +5,9 @@
 package resources
 
 type TxBlob struct {
-	Network   string `json:"network"`
-	PaymentId string `json:"payment_id"`
-	Recipient string `json:"recipient"`
-	TxHash    string `json:"tx_hash"`
+	NetworkFrom string `json:"network_from"`
+	NetworkTo   string `json:"network_to"`
+	PaymentId   string `json:"payment_id"`
+	Recipient   string `json:"recipient"`
+	TxHash      string `json:"tx_hash"`
 }

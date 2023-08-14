@@ -1,7 +1,6 @@
 package pg
 
 import (
-	"database/sql"
 	"fmt"
 	sq "github.com/Masterminds/squirrel"
 	"github.com/dl-only-tokens/back-listener/internal/data"
@@ -14,7 +13,7 @@ const transactionTableName = "transactions"
 
 const (
 	idField      = "id"
-	addressField = "address"
+	addressField = "recipient"
 )
 
 func NewTransactionsQ(db *pgdb.DB) data.TransactionsQ {
@@ -36,9 +35,6 @@ func (q *TransactionsQ) New() data.TransactionsQ {
 func (q *TransactionsQ) Select() ([]data.Transactions, error) {
 	var result []data.Transactions
 	err := q.db.Select(&result, q.sql)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to select txs")
 	}

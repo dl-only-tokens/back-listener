@@ -12,12 +12,12 @@ type masterQ struct {
 
 func NewMasterQ(db *pgdb.DB) data.MasterQ {
 	return &masterQ{
-		db: db.Clone(),
+		db: db,
 	}
 }
 
 func (q *masterQ) New() data.MasterQ {
-	return NewMasterQ(q.db)
+	return NewMasterQ(q.db.Clone())
 }
 
 func (q *masterQ) TransactionsQ() data.TransactionsQ {

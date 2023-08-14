@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"database/sql"
+	"errors"
 	"github.com/dl-only-tokens/back-listener/internal/data"
 	"github.com/dl-only-tokens/back-listener/internal/service/api/requests"
 	"github.com/dl-only-tokens/back-listener/resources"
@@ -19,12 +21,13 @@ func GetTxLists(w http.ResponseWriter, r *http.Request) {
 
 	txs, err := MasterQ(r).TransactionsQ().New().FilterByAddress(req.Address).Select()
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			Log(r).WithError(err).Error("failed to empty select list")
+			ape.Render(w, resources.GetTxListResponse{})
+			return
+		}
+
 		Log(r).WithError(err).Error("failed to select txs by address")
-		ape.RenderErr(w, problems.InternalError())
-		return
-	}
-	if txs == nil {
-		Log(r).WithError(err).Error("failed to empty select list")
 		ape.RenderErr(w, problems.InternalError())
 		return
 	}
@@ -36,9 +39,11 @@ func prepareResponse(txs []data.Transactions) resources.GetTxListResponse {
 	txBlobs := make([]resources.TxBlob, 0)
 	for _, tx := range txs {
 		blob := resources.TxBlob{
-			PaymentId: tx.PaymentID,
-			Recipient: tx.Recipient,
-			TxHash:    tx.TxHash,
+			NetworkFrom: tx.NetworkFrom,
+			NetworkTo:   tx.NetworkTo,
+			PaymentId:   tx.PaymentID,
+			Recipient:   tx.Recipient,
+			TxHash:      tx.TxHash,
 		}
 		txBlobs = append(txBlobs, blob)
 	}

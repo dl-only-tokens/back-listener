@@ -27,14 +27,14 @@ func (h RarimoApi) GetContractsAddresses() ([]config.NetInfo, error) {
 		return nil, errors.Wrap(err, "failed to send request")
 	}
 
-	if resp.StatusCode >= 300 && resp.StatusCode < 500 {
-		return nil, errors.New("bad response code")
+	if resp.StatusCode >= 300 {
+		return nil, errors.New("failed get contract addresses via rarimo api: bad response code")
 	}
 
 	decodedResponse := new(NetworkListResponse)
 
 	if err := json.NewDecoder(resp.Body).Decode(&decodedResponse); err != nil {
-		return nil, errors.New("failed to decode response ")
+		return nil, errors.Wrap(err, "failed to decode response ")
 	}
 	return h.parseResponse(decodedResponse.Data), nil
 }

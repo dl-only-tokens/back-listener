@@ -12,7 +12,7 @@ type NetworkConfiger interface {
 }
 
 type Network struct {
-	NetInfoList []NetInfo `fig:"list"`
+	NetInfoList []NetInfo `fig:"keys"`
 }
 
 type NetInfo struct {

@@ -9,7 +9,7 @@ listener:
   addr: :8000
 
 networks:
-  list:
+  keys:
     - name: 'Ethereum'
       rpc: "https://mainnet.infura.io/v3/5afc5eb6b4424ad39f8c0db22125074a"
     - name: 'Polygon'

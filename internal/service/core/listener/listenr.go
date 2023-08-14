@@ -119,10 +119,8 @@ func (l *ListenData) Run() {
 
 func (l *ListenData) getTxIntputsOnBlock(txHashes []RecipientInfo, block *types.Block) map[string][]string {
 	result := make(map[string][]string)
-
 	for _, info := range txHashes {
 		tx := block.Transaction(info.TxHash)
-		l.log.Debug(hex.EncodeToString(tx.Data()))
 
 		parsedData, err := l.parsePayloadOnInput(hex.EncodeToString(tx.Data()), l.txMetaData.Header, l.txMetaData.Footer) //todo header
 		if err != nil {
@@ -135,6 +133,7 @@ func (l *ListenData) getTxIntputsOnBlock(txHashes []RecipientInfo, block *types.
 	return result
 }
 
+// parse some encoded info(payment id,  network  from  and  network  to ) from tx data
 func (l *ListenData) parsePayloadOnInput(input string, header string, footer string) ([]string, error) { //move to  another class
 	index := strings.Index(input, header)
 	if index == -1 {
