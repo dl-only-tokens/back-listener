@@ -9,19 +9,9 @@ git:
   - add: /
     to: /
     stageDependencies:
-      install:
-        - go.mod
-        - go.sum
       setup:
         - "**/*"
 shell:
-  beforeInstall:
-    - apk add git build-base
-  install:
-    - git config --global url."https://gitlab-ci-token:{{ env "CI_JOB_TOKEN" }}@gitlab.com/".insteadOf https://gitlab.com/
-    - go env -w GOPRIVATE=gitlab.com/*
-    - go mod tidy
-    - go mod vendor
   setup:
     - export CGO_ENABLED=0
     - export GO111MODULE=off
