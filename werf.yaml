@@ -21,8 +21,6 @@ shell:
 ---
 image: service
 from: alpine:3.18
-docker:
-  ENTRYPOINT: back-listener
 shell:
   setup:
     - apk add --no-cache ca-certificates
@@ -30,4 +28,4 @@ import:
   - image: builder
     add: /usr/local/bin/back-listener
     to: /usr/local/bin/back-listener
-    after: builder
+    after: setup
