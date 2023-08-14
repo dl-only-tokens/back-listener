@@ -4,7 +4,7 @@ project: "backend"
 image: builder
 from: golang:1.16.2-stretch
 docker:
-  WORKDIR: /go/src/gitlab.com/tokend/blockparty/marketplace-v2-svc
+  WORKDIR: /go/src/github.com/dl-only-tokens/back-listener
 git:
   - add: /
     to: /
