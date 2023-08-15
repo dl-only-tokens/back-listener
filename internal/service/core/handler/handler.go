@@ -33,6 +33,7 @@ func NewHandler(log *logan.Entry, networker []config.NetInfo, rarimoApi *config.
 		masterQ:         masterQ,
 		isAutoInit:      rarimoApi.IsAutoInit,
 		txMetaData:      metaData,
+		abiPath:         chainListener.AbiPath,
 	}
 }
 
@@ -109,7 +110,7 @@ func (h *ListenerHandler) prepareNewListener(network string, address string) (li
 		NetworkName: network,
 	}
 
-	return listener.NewListener(h.log, h.pauseTime, info, h.masterQ, h.txMetaData, h.healthCheckChan), nil
+	return listener.NewListener(h.log, h.pauseTime, info, h.masterQ, h.txMetaData, h.healthCheckChan, h.abiPath), nil
 }
 
 func (h *ListenerHandler) healthCheck() {

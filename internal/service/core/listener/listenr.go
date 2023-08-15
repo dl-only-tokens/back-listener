@@ -33,6 +33,7 @@ type ListenData struct {
 	masterQ         data.MasterQ
 	txMetaData      *config.MetaData
 	healthCheckChan chan StateInfo
+	abiPath         string
 }
 
 type EthInfo struct {
@@ -41,7 +42,7 @@ type EthInfo struct {
 	NetworkName string
 }
 
-func NewListener(log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.MasterQ, metaData *config.MetaData, healthCheckChan chan StateInfo) Listener {
+func NewListener(log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.MasterQ, metaData *config.MetaData, healthCheckChan chan StateInfo, abiPath string) Listener {
 	return &ListenData{
 		id:              ethInfo.NetworkName,
 		log:             log,
@@ -52,6 +53,7 @@ func NewListener(log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.
 		masterQ:         masterQ,
 		txMetaData:      metaData,
 		healthCheckChan: healthCheckChan,
+		abiPath:         abiPath,
 	}
 }
 
@@ -210,7 +212,7 @@ func (l *ListenData) interfaceToTx(any interface{}) (*[]data.Transactions, error
 func (l *ListenData) parseRecipientFromEvent(events []types.Log) ([]RecipientInfo, error) {
 	result := make([]RecipientInfo, 0)
 
-	abiBytes, err := os.ReadFile("./internal/contract/erc20/erc20.abi") //todo config
+	abiBytes, err := os.ReadFile(l.abiPath)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read file ")
 	}

@@ -23,4 +23,5 @@ type ListenerHandler struct {
 	masterQ         data.MasterQ
 	isAutoInit      bool
 	txMetaData      *config.MetaData
+	abiPath         string
 }

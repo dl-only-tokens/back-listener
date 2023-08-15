@@ -12,7 +12,8 @@ type ChainListenerConfiger interface {
 }
 
 type ChainListener struct {
-	PauseTime int `fig:"pause_time"`
+	PauseTime int    `fig:"pause_time"`
+	AbiPath   string `fig:"abi_path"`
 }
 
 func NewChainListenerConfiger(getter kv.Getter) ChainListenerConfiger {

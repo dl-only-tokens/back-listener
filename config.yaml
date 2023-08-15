@@ -34,6 +34,7 @@ meta_data:
 
 chain_listener:
   pause_time: 2
+  abi_path: "pkg/contract/erc20/erc20.abi""
 
 #meta_data:
 #  header: "fa1afb7a:"
