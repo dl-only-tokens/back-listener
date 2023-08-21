@@ -108,6 +108,7 @@ func (l *ListenData) Run() {
 				l.log.WithError(err).Error("failed to  get suitable")
 				continue
 			}
+
 			if err = l.insertTxs(l.prepareDataToInsert(l.getTxIntputsOnBlock(suitableTXs, block))); err != nil {
 				l.log.Error(errors.Wrap(err, "failed to use transaction"))
 				continue
@@ -175,14 +176,21 @@ func (l *ListenData) prepareDataToInsert(inputs map[string][]string) []data.Tran
 	response := make([]data.Transactions, 0)
 	for txHash, payload := range inputs {
 
-		response = append(response,
-			data.Transactions{
-				PaymentID:   payload[1],
-				NetworkFrom: payload[2],
-				NetworkTo:   payload[3],
-				Recipient:   payload[4],
-				TxHash:      txHash,
-			})
+		tx := data.Transactions{
+			PaymentID:   payload[1],
+			NetworkFrom: payload[2],
+			NetworkTo:   payload[3],
+			Recipient:   payload[4],
+		}
+
+		if tx.NetworkTo == l.id {
+			tx.TxHashTo = txHash
+			response = append(response, tx)
+			continue
+		}
+
+		tx.TxHashFrom = txHash
+		response = append(response, tx)
 	}
 
 	return response
@@ -194,9 +202,26 @@ func (l *ListenData) insertTxs(any interface{}) error {
 		return errors.Wrap(err, "failed tom decode data")
 	}
 	for _, tx := range *txs {
-		if err := l.masterQ.TransactionsQ().New().Insert(&tx); err != nil {
-			return errors.Wrap(err, "failed to  insert tx to db")
+
+		selectedTxs, err := l.masterQ.TransactionsQ().New().FilterByPaymentID(tx.PaymentID).Select()
+		if err != nil {
+			return errors.Wrap(err, "failed to  select tx to db")
 		}
+
+		if selectedTxs != nil {
+			if err = l.masterQ.TransactionsQ().New().Insert(&tx); err != nil {
+				return errors.Wrap(err, "failed to  insert tx to db")
+			}
+		}
+
+		if len(selectedTxs[0].TxHashTo) != 0 && len(selectedTxs[0].TxHashFrom) != 0 {
+			return nil
+		}
+
+		if err = l.masterQ.TransactionsQ().Update(&selectedTxs[0]); err != nil {
+			return errors.Wrap(err, "failed to update tx to db")
+		}
+
 	}
 	return nil
 }

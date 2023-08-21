@@ -3,7 +3,7 @@ allOf:
   - type: object
     required:
       - attributes
-      - relationship
+      - relationships
     properties:
       attributes:
         type: object
@@ -15,11 +15,20 @@ allOf:
             items:
               type: object
               $ref: '#/components/schemas/TxBlob'
-      relationship:
+      relationships:
         type: object
         required:
-          - address:
+          - data
         properties:
-          address :
-            type: string
-            example: 0x1234.....
+          data:
+            type: object
+            required:
+              - attributes
+            attributes:
+              type: object
+              required:
+                - address:
+              properties:
+                address:
+                  type: string
+                  example: 0x1234.....

@@ -10,7 +10,9 @@ properties:
     type: string
   recipient:
     type: string
-  tx_hash:
+  tx_hash_from:
+    type: string
+  tx_hash_to:
     type: string
   network_from:
     type: string

@@ -6,7 +6,8 @@ package resources
 
 type GetTxList struct {
 	Key
-	Attributes GetTxListAttributes `json:"attributes"`
+	Attributes    GetTxListAttributes    `json:"attributes"`
+	Relationships GetTxListRelationships `json:"relationships"`
 }
 type GetTxListResponse struct {
 	Data     GetTxList `json:"data"`

@@ -8,12 +8,15 @@ type TransactionsQ interface {
 	FilterByAddress(address string) TransactionsQ
 	Select() ([]Transactions, error)
 	Page(pageParams pgdb.OffsetPageParams) TransactionsQ
+	FilterByPaymentID(paymentID string) TransactionsQ
+	Update(client *Transactions) error
 }
 
 type Transactions struct {
 	PaymentID   string `db:"payment_id" structs:"payment_id"`
 	NetworkFrom string `db:"network_from" structs:"network_from"`
-	TxHash      string `db:"tx_hash" structs:"tx_hash"`
+	TxHashFrom  string `db:"tx_hash_from" structs:"tx_hash_from"`
+	TxHashTo    string `db:"tx_hash_to" structs:"tx_hash_to"`
 	NetworkTo   string `db:"network_to" structs:"network_to"`
 	Recipient   string `db:"recipient" structs:"recipient"`
 }

@@ -1,0 +1,11 @@
+type: object
+required:
+  - attributes
+attributes:
+  type: object
+  required:
+    - address:
+  properties:
+    address:
+      type: string
+      example: 0x1234.....
