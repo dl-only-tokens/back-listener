@@ -1,6 +1,7 @@
 -- +migrate Up
 CREATE TABLE transactions (
     payment_id VARCHAR(73),
+    sender VARCHAR(42),
     recipient VARCHAR(42),
     tx_hash_to VARCHAR(100) ,
     tx_hash_from VARCHAR(100) ,

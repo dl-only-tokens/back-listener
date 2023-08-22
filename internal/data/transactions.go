@@ -5,11 +5,13 @@ import "gitlab.com/distributed_lab/kit/pgdb"
 type TransactionsQ interface {
 	New() TransactionsQ
 	Insert(data *Transactions) error
-	FilterByAddress(address string) TransactionsQ
+	FilterByRecipient(address string) TransactionsQ
 	Select() ([]Transactions, error)
 	Page(pageParams pgdb.OffsetPageParams) TransactionsQ
 	FilterByPaymentID(paymentID string) TransactionsQ
-	Update(client *Transactions) error
+	Update(data *Transactions) error
+	FilterByReady() TransactionsQ
+	FilterByNotReady() TransactionsQ
 }
 
 type Transactions struct {
@@ -19,4 +21,5 @@ type Transactions struct {
 	TxHashTo    string `db:"tx_hash_to" structs:"tx_hash_to"`
 	NetworkTo   string `db:"network_to" structs:"network_to"`
 	Recipient   string `db:"recipient" structs:"recipient"`
+	Sender      string `db:"sender" structs:"sender"`
 }

@@ -10,17 +10,13 @@ listener:
 
 networks:
   keys:
-    - name: 'Ethereum'
-      rpc: "https://mainnet.infura.io/v3/5aabf6bd4d384c288d6f85d3d6278234"
-    - name: 'Polygon'
-      rpc: "https://polygon-mainnet.infura.io/v3/5aabf6bd4d384c288d6f85d3d6278234"
-    - name: 'Avalanche'
-      rpc: "https://avalanche-mainnet.infura.io/v3/5aabf6bd4d384c288d6f85d3d6278234"
     - name: 'Goerli'
+      chain_id: 5
       rpc:  "https://goerli.infura.io/v3/5aabf6bd4d384c288d6f85d3d6278234"
-    - name: 'Sepolia'
-      rpc:  "https://sepolia.infura.io/v3/5aabf6bd4d384c288d6f85d3d6278234"
+#    - name: 'Fuji'
+#      rpc:  "https://avalanche-fuji.infura.io/v3/5aabf6bd4d384c288d6f85d3d6278234"
     - name: 'BSC Testnet'
+      chain_id: 97
       rpc:  "https://bsc-testnet.publicnode.com"
 
 
@@ -33,7 +29,7 @@ meta_data:
   footer: "3b"
 
 chain_listener:
-  pause_time: 2
+  pause_time: 500
   abi_path: "./pkg/contract/erc20/erc20.abi"
 
 cop:

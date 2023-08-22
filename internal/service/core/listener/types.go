@@ -15,5 +15,6 @@ type StateInfo struct {
 
 type RecipientInfo struct {
 	Recipient string
+	Sender    string
 	TxHash    common.Hash
 }

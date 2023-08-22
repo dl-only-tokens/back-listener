@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"fmt"
 	"github.com/dl-only-tokens/back-listener/internal/config"
 	"github.com/dl-only-tokens/back-listener/internal/data"
 	"github.com/dl-only-tokens/back-listener/internal/service/core/listener"
@@ -97,7 +98,7 @@ func (h *ListenerHandler) initListeners(data []config.NetInfo) error {
 func (h *ListenerHandler) prepareNewListener(network string, address string) (listener.Listener, error) {
 	netInfo := h.findNetwork(network)
 	if netInfo == nil {
-		return nil, errors.New("unsupported network")
+		return nil, errors.New(fmt.Sprintf("unsupported network: %s", network))
 	}
 
 	if len(address) == 0 {
@@ -107,6 +108,7 @@ func (h *ListenerHandler) prepareNewListener(network string, address string) (li
 	info := listener.EthInfo{
 		Address:     address,
 		RPC:         netInfo.Rpc,
+		ChainID:     netInfo.ChainID,
 		NetworkName: network,
 	}
 

@@ -19,7 +19,7 @@ func GetTxLists(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	txs, err := MasterQ(r).TransactionsQ().New().FilterByAddress(req.Address).Select()
+	txs, err := MasterQ(r).TransactionsQ().New().FilterByRecipient(req.Address).Select()
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			Log(r).WithError(err).Error("failed to empty select list")

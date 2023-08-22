@@ -12,9 +12,11 @@ import (
 const transactionTableName = "transactions"
 
 const (
-	idField      = "id"
-	addressField = "recipient"
-	paymentID    = "payment_id"
+	idField         = "id"
+	recipientField  = "recipient"
+	paymentIDField  = "payment_id"
+	txHashFromField = "tx_hash_from"
+	txHashToField   = "tx_hash_to"
 )
 
 func NewTransactionsQ(db *pgdb.DB) data.TransactionsQ {
@@ -35,10 +37,10 @@ func (q *TransactionsQ) New() data.TransactionsQ {
 	return NewTransactionsQ(q.db.Clone())
 }
 
-func (q *TransactionsQ) Update(client *data.Transactions) error {
-	clauses := structs.Map(client)
+func (q *TransactionsQ) Update(data *data.Transactions) error {
+	clauses := structs.Map(data)
 	if err := q.db.Exec(q.upd.SetMap(clauses)); err != nil {
-		return errors.Wrap(err, "failed to update client")
+		return errors.Wrap(err, "failed to update data")
 	}
 
 	return nil
@@ -64,16 +66,33 @@ func (q *TransactionsQ) Insert(value *data.Transactions) error {
 	return nil
 }
 
-func (q *TransactionsQ) FilterByAddress(address string) data.TransactionsQ {
-	q.sql = q.sql.Where(sq.Eq{addressField: address})
-	q.upd = q.upd.Where(sq.Eq{addressField: address})
+func (q *TransactionsQ) FilterByRecipient(address string) data.TransactionsQ {
+	q.sql = q.sql.Where(sq.Eq{recipientField: address})
+	q.upd = q.upd.Where(sq.Eq{recipientField: address})
 
 	return q
 }
 
 func (q *TransactionsQ) FilterByPaymentID(paymentID string) data.TransactionsQ {
-	q.sql = q.sql.Where(sq.Eq{paymentID: paymentID})
-	q.upd = q.upd.Where(sq.Eq{paymentID: paymentID})
+	q.sql = q.sql.Where(sq.Eq{paymentIDField: paymentID})
+	q.upd = q.upd.Where(sq.Eq{paymentIDField: paymentID})
+
+	return q
+}
+
+func (q *TransactionsQ) FilterByReady() data.TransactionsQ {
+	q.sql = q.sql.Where(sq.NotEq{txHashToField: ""})
+	q.upd = q.upd.Where(sq.NotEq{txHashToField: ""})
+
+	q.sql = q.sql.Where(sq.NotEq{txHashFromField: ""})
+	q.upd = q.upd.Where(sq.NotEq{txHashFromField: ""})
+
+	return q
+}
+
+func (q *TransactionsQ) FilterByNotReady() data.TransactionsQ {
+	q.sql = q.sql.Where(sq.Eq{txHashToField: ""})
+	q.upd = q.upd.Where(sq.Eq{txHashToField: ""})
 
 	return q
 }
