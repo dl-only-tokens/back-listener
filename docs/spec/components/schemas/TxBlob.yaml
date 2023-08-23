@@ -3,14 +3,18 @@ required:
   - payment_id
   - tx_hash
   - recipient
+  - sender
   - tx_hash_from
   - tx_hash_to
   - network_from
   - network_to
+  - value_to
 properties:
   payment_id:
     type: string
   recipient:
+    type: string
+  sender:
     type: string
   tx_hash_from:
     type: string
@@ -19,4 +23,6 @@ properties:
   network_from:
     type: string
   network_to:
+    type: string
+  value_to:
     type: string

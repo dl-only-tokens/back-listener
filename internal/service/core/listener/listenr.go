@@ -36,6 +36,7 @@ type ListenData struct {
 	txMetaData      *config.MetaData
 	healthCheckChan chan StateInfo
 	abiPath         string
+	clientRPC       *ethclient.Client
 }
 
 type EthInfo struct {
@@ -62,7 +63,8 @@ func NewListener(log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.
 }
 
 func (l *ListenData) Run() {
-	client, err := ethclient.Dial(l.rpc)
+	var err error
+	l.clientRPC, err = ethclient.Dial(l.rpc)
 	if err != nil {
 
 		l.log.WithError(err).Error("failed to connect to node")
@@ -77,9 +79,9 @@ func (l *ListenData) Run() {
 
 	var previewHash common.Hash
 
-	ticker := time.NewTicker(time.Duration(l.pauseTime) * time.Millisecond)
+	ticker := time.NewTicker(time.Duration(l.pauseTime) * time.Second)
 
-	go l.indexContractTxs(client)
+	go l.indexContractTxs()
 
 	for {
 		select {
@@ -89,7 +91,7 @@ func (l *ListenData) Run() {
 			}
 			return
 		case <-ticker.C:
-			block, err := client.BlockByNumber(context.Background(), nil)
+			block, err := l.clientRPC.BlockByNumber(context.Background(), nil)
 			if err != nil {
 				l.log.WithError(err).Error(l.chainName, ": failed to get last block ")
 				return
@@ -106,12 +108,12 @@ func (l *ListenData) Run() {
 			}
 			previewHash = hash
 
-			logs, err := client.FilterLogs(context.Background(), query)
+			logs, err := l.clientRPC.FilterLogs(context.Background(), query)
 			if err != nil {
 				continue
 			}
 
-			suitableTXs, err := l.parseRecipientFromEvent(logs, block.Hash(), client)
+			suitableTXs, err := l.parseRecipientFromEvent(logs, block.Hash())
 			if err != nil {
 				l.log.WithError(err).Error("failed to  get suitable")
 				continue
@@ -192,11 +194,12 @@ func (l *ListenData) prepareDataToInsert(inputs map[string][]string) []data.Tran
 			PaymentID:   payload[1],
 			NetworkFrom: payload[2],
 			NetworkTo:   payload[3],
+			ValueTo:     payload[4],
 		}
 
-		if len(payload) > 4 {
-			tx.Recipient = payload[4]
-			tx.Sender = payload[5]
+		if len(payload) > 5 {
+			tx.Recipient = payload[5]
+			tx.Sender = payload[6]
 		}
 
 		if tx.NetworkTo == l.chainID {
@@ -237,7 +240,11 @@ func (l *ListenData) insertTxs(any interface{}) error {
 			return nil
 		}
 
-		if err = l.masterQ.TransactionsQ().New().FilterByPaymentID(tx.PaymentID).Update(l.packTX(selectedTxs[0], tx)); err != nil {
+		finallTx, err := l.setTimestamp(l.packTX(selectedTxs[0], tx))
+		if err != nil {
+			return errors.Wrap(err, " failed to set value and timestamp ")
+		}
+		if err = l.masterQ.TransactionsQ().New().FilterByPaymentID(tx.PaymentID).Update(finallTx); err != nil {
 			return errors.Wrap(err, "failed to update tx to db")
 		}
 
@@ -253,7 +260,7 @@ func (l *ListenData) interfaceToTx(any interface{}) (*[]data.Transactions, error
 	return nil, errors.New("data cant be converted to TX")
 }
 
-func (l *ListenData) parseRecipientFromEvent(events []types.Log, blockHash common.Hash, client *ethclient.Client) ([]RecipientInfo, error) {
+func (l *ListenData) parseRecipientFromEvent(events []types.Log, blockHash common.Hash) ([]RecipientInfo, error) {
 	result := make([]RecipientInfo, 0)
 
 	abiBytes, err := os.ReadFile(l.abiPath)
@@ -277,7 +284,7 @@ func (l *ListenData) parseRecipientFromEvent(events []types.Log, blockHash commo
 			continue
 		}
 
-		sender, err := l.getSender(vLog.TxHash.String(), client, blockHash, vLog.TxIndex)
+		sender, err := l.getSender(vLog.TxHash.String(), blockHash, vLog.TxIndex)
 		if err != nil {
 			l.log.WithError(err).Error("failed to get sender")
 			continue
@@ -293,8 +300,8 @@ func (l *ListenData) parseRecipientFromEvent(events []types.Log, blockHash commo
 	return result, nil
 }
 
-func (l *ListenData) indexContractTxs(client *ethclient.Client) {
-	ticker := time.NewTicker(time.Duration(l.pauseTime) * time.Millisecond)
+func (l *ListenData) indexContractTxs() {
+	ticker := time.NewTicker(time.Duration(l.pauseTime) * time.Second)
 	var previewHash common.Hash
 
 	for {
@@ -305,7 +312,7 @@ func (l *ListenData) indexContractTxs(client *ethclient.Client) {
 			}
 			return
 		case <-ticker.C:
-			block, err := client.BlockByNumber(context.Background(), nil)
+			block, err := l.clientRPC.BlockByNumber(context.Background(), nil)
 			if err != nil {
 				l.log.WithError(err).Error(l.chainName, ": failed to get last block ")
 				return
@@ -343,7 +350,6 @@ func (l *ListenData) filteringTx(block *types.Block) map[string][]string {
 	result := make(map[string][]string)
 	for _, tx := range block.Transactions() {
 		if tx.To() != nil && bytes.Compare(tx.To().Bytes(), hexutil.MustDecode(l.address)) == 0 {
-
 			parsedData, err := l.parsePayloadOnInput(hex.EncodeToString(tx.Data()), l.txMetaData.Header, l.txMetaData.Footer)
 			if err != nil {
 				continue
@@ -372,16 +378,27 @@ func (l *ListenData) packTX(firstTX data.Transactions, secondTX data.Transaction
 	return &firstTX
 }
 
-func (l *ListenData) getSender(txHash string, client *ethclient.Client, blockHash common.Hash, txIndex uint) (string, error) {
-	tx, _, err := client.TransactionByHash(l.ctx, common.HexToHash(txHash))
+func (l *ListenData) getSender(txHash string, blockHash common.Hash, txIndex uint) (string, error) {
+	tx, _, err := l.clientRPC.TransactionByHash(l.ctx, common.HexToHash(txHash))
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get transaction  by  hash")
 	}
 
-	sender, err := client.TransactionSender(l.ctx, tx, blockHash, txIndex)
+	sender, err := l.clientRPC.TransactionSender(l.ctx, tx, blockHash, txIndex)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get tx")
 	}
 
 	return sender.Hex(), nil
+}
+
+func (l *ListenData) setTimestamp(transaction *data.Transactions) (*data.Transactions, error) {
+	tx, _, err := l.clientRPC.TransactionByHash(l.ctx, common.HexToHash(transaction.TxHashTo))
+	if err != nil {
+		return transaction, errors.Wrap(err, "failed to get transaction  by  hash")
+	}
+
+	transaction.TimestampTo = tx.Time()
+
+	return transaction, nil
 }
