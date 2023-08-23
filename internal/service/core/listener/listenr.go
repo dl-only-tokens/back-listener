@@ -62,6 +62,10 @@ func NewListener(log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.
 	}
 }
 
+func (l *ListenData) GetNetwork() string {
+	return l.chainName
+}
+
 func (l *ListenData) Run() {
 	var err error
 	l.clientRPC, err = ethclient.Dial(l.rpc)
@@ -134,8 +138,50 @@ func (l *ListenData) Run() {
 	}
 }
 
-func (l *ListenData) GetNetwork() string {
-	return l.chainName
+func (l *ListenData) indexContractTxs() {
+	ticker := time.NewTicker(time.Duration(l.pauseTime) * time.Second)
+	var previewHash common.Hash
+
+	for {
+		select {
+		case <-l.ctx.Done():
+			l.healthCheckChan <- StateInfo{
+				Name: l.chainName,
+			}
+			return
+		case <-ticker.C:
+			block, err := l.clientRPC.BlockByNumber(context.Background(), nil)
+			if err != nil {
+				l.log.WithError(err).Error(l.chainName, ": failed to get last block ")
+				return
+			}
+
+			hash := block.Hash()
+			if previewHash == hash {
+				continue
+			}
+
+			previewHash = hash
+
+			contractTXsOnBlock := l.filteringTx(block)
+			if len(contractTXsOnBlock) == 0 {
+				continue
+			}
+
+			l.log.Debug("Indexer: contractTXsOnBlock:  ", contractTXsOnBlock)
+
+			txs := l.prepareDataToInsert(contractTXsOnBlock)
+			l.log.Debug("Indexer: txs:  ", txs)
+
+			if err = l.insertTxs(txs); err != nil {
+				l.log.Error(errors.Wrap(err, "failed to use transaction"))
+				return
+			}
+
+			break
+		}
+
+	}
 }
 
 func (l *ListenData) getTxIntputsOnBlock(txHashes []RecipientInfo, block *types.Block) map[string][]string {
@@ -298,52 +344,6 @@ func (l *ListenData) parseRecipientFromEvent(events []types.Log, blockHash commo
 	}
 
 	return result, nil
-}
-
-func (l *ListenData) indexContractTxs() {
-	ticker := time.NewTicker(time.Duration(l.pauseTime) * time.Second)
-	var previewHash common.Hash
-
-	for {
-		select {
-		case <-l.ctx.Done():
-			l.healthCheckChan <- StateInfo{
-				Name: l.chainName,
-			}
-			return
-		case <-ticker.C:
-			block, err := l.clientRPC.BlockByNumber(context.Background(), nil)
-			if err != nil {
-				l.log.WithError(err).Error(l.chainName, ": failed to get last block ")
-				return
-			}
-
-			hash := block.Hash()
-			if previewHash == hash {
-				continue
-			}
-
-			previewHash = hash
-
-			contractTXsOnBlock := l.filteringTx(block)
-			if len(contractTXsOnBlock) == 0 {
-				continue
-			}
-
-			l.log.Debug("Indexer: contractTXsOnBlock:  ", contractTXsOnBlock)
-
-			txs := l.prepareDataToInsert(contractTXsOnBlock)
-			l.log.Debug("Indexer: txs:  ", txs)
-
-			if err = l.insertTxs(txs); err != nil {
-				l.log.Error(errors.Wrap(err, "failed to use transaction"))
-				return
-			}
-
-			break
-		}
-
-	}
 }
 
 func (l *ListenData) filteringTx(block *types.Block) map[string][]string {

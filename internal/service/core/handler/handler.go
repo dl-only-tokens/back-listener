@@ -109,6 +109,10 @@ func (h *ListenerHandler) prepareNewListener(network string, address string) (li
 	return listener.NewListener(h.log, h.pauseTime, info, h.masterQ, h.txMetaData, h.healthCheckChan, h.abiPath), nil
 }
 
+func (h *ListenerHandler) addNewListener(listener listener.Listener) {
+	h.Listeners.Store(listener, false)
+}
+
 func (h *ListenerHandler) healthCheck() {
 	for {
 		select {
@@ -126,10 +130,6 @@ func (h *ListenerHandler) findByNetwork(network string) listener.Listener {
 	}
 
 	return nil
-}
-
-func (h *ListenerHandler) addNewListener(listener listener.Listener) {
-	h.Listeners.Store(listener, false)
 }
 
 func (h *ListenerHandler) findNetwork(network string) *config.NetInfo {
