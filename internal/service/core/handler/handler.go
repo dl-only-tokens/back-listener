@@ -14,13 +14,6 @@ import (
 type Handler interface {
 	Run()
 	Init() error
-	healthCheck()
-	autoInitContracts() error
-	initListeners(data []config.NetInfo) error
-	findByNetwork(network string) listener.Listener
-	prepareNewListener(network string, address string) (listener.Listener, error)
-	addNewListener(listener listener.Listener)
-	findNetwork(network string) *config.NetInfo
 }
 
 func NewHandler(log *logan.Entry, networker []config.NetInfo, rarimoApi *config.API, masterQ data.MasterQ, metaData *config.MetaData, chainListener *config.ChainListener) Handler {
@@ -92,6 +85,7 @@ func (h *ListenerHandler) initListeners(data []config.NetInfo) error {
 
 		h.addNewListener(preparedListener)
 	}
+
 	return nil
 }
 
@@ -130,6 +124,7 @@ func (h *ListenerHandler) findByNetwork(network string) listener.Listener {
 			return l
 		}
 	}
+
 	return nil
 }
 
@@ -143,5 +138,6 @@ func (h *ListenerHandler) findNetwork(network string) *config.NetInfo {
 			return &l
 		}
 	}
+
 	return nil
 }

@@ -5,5 +5,5 @@
 package resources
 
 type GetTxListRelationships struct {
-	Data map[string]interface{} `json:"data"`
+	Data TxBlobRelationship `json:"data"`
 }

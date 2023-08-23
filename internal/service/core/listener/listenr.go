@@ -91,7 +91,7 @@ func (l *ListenData) Run() {
 		case <-ticker.C:
 			block, err := client.BlockByNumber(context.Background(), nil)
 			if err != nil {
-				l.log.WithError(err).Error("failed to get last block ")
+				l.log.WithError(err).Error(l.chainName, ": failed to get last block ")
 				return
 			}
 
@@ -272,7 +272,7 @@ func (l *ListenData) parseRecipientFromEvent(events []types.Log, blockHash commo
 			l.log.WithError(err).Error("failed to unpack abi")
 			continue
 		}
-		if len(event) < 6 {
+		if len(event) < receiverPositionOnEvent+1 {
 			l.log.Error("event too short")
 			continue
 		}
@@ -284,7 +284,7 @@ func (l *ListenData) parseRecipientFromEvent(events []types.Log, blockHash commo
 		}
 
 		result = append(result, RecipientInfo{
-			Recipient: event[5].(string),
+			Recipient: event[receiverPositionOnEvent].(string),
 			TxHash:    vLog.TxHash,
 			Sender:    sender,
 		})
@@ -307,7 +307,7 @@ func (l *ListenData) indexContractTxs(client *ethclient.Client) {
 		case <-ticker.C:
 			block, err := client.BlockByNumber(context.Background(), nil)
 			if err != nil {
-				l.log.WithError(err).Error("failed to get last block ")
+				l.log.WithError(err).Error(l.chainName, ": failed to get last block ")
 				return
 			}
 
@@ -341,10 +341,6 @@ func (l *ListenData) indexContractTxs(client *ethclient.Client) {
 
 func (l *ListenData) filteringTx(block *types.Block) map[string][]string {
 	result := make(map[string][]string)
-	if l.chainName == "BSC Testnet" {
-		l.log.Debug(block.NumberU64(), "   ", l.chainName)
-	}
-
 	for _, tx := range block.Transactions() {
 		if tx.To() != nil && bytes.Compare(tx.To().Bytes(), hexutil.MustDecode(l.address)) == 0 {
 
@@ -372,6 +368,7 @@ func (l *ListenData) parseAddressesFromTXs(txs []data.Transactions) []string {
 
 func (l *ListenData) packTX(firstTX data.Transactions, secondTX data.Transactions) *data.Transactions {
 	firstTX.TxHashTo = secondTX.TxHashTo
+
 	return &firstTX
 }
 
@@ -385,5 +382,6 @@ func (l *ListenData) getSender(txHash string, client *ethclient.Client, blockHas
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get tx")
 	}
+
 	return sender.Hex(), nil
 }

@@ -3,6 +3,8 @@ required:
   - payment_id
   - tx_hash
   - recipient
+  - tx_hash_from
+  - tx_hash_to
   - network_from
   - network_to
 properties:

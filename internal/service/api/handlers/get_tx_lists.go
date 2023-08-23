@@ -43,7 +43,8 @@ func prepareResponse(txs []data.Transactions) resources.GetTxListResponse {
 			NetworkTo:   tx.NetworkTo,
 			PaymentId:   tx.PaymentID,
 			Recipient:   tx.Recipient,
-			//TxHash:      tx.TxHash,
+			TxHashTo:    tx.TxHashTo,
+			TxHashFrom:  tx.TxHashFrom,
 		}
 		txBlobs = append(txBlobs, blob)
 	}
