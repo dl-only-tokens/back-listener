@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/hex"
+	"fmt"
 	"github.com/dl-only-tokens/back-listener/internal/config"
 	"github.com/dl-only-tokens/back-listener/internal/data"
 	"github.com/ethereum/go-ethereum"
@@ -16,20 +17,23 @@ import (
 	"gitlab.com/distributed_lab/logan/v3"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
 type Listener interface {
 	Run()
 	GetNetwork() string
+	Restart(parent context.Context)
 }
 
 type ListenData struct {
-	chainID         string
+	chainID         int32
 	chainName       string
 	log             *logan.Entry
 	pauseTime       int
 	ctx             context.Context
+	ctxCancelFunc   context.CancelFunc
 	rpc             string
 	address         string
 	masterQ         data.MasterQ
@@ -42,17 +46,19 @@ type ListenData struct {
 type EthInfo struct {
 	Address     string
 	RPC         string
-	ChainID     string
+	ChainID     int32
 	NetworkName string
 }
 
-func NewListener(log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.MasterQ, metaData *config.MetaData, healthCheckChan chan StateInfo, abiPath string) Listener {
+func NewListener(parentCtx context.Context, log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.MasterQ, metaData *config.MetaData, healthCheckChan chan StateInfo, abiPath string) Listener {
+	ctx, cancelFunc := context.WithCancel(parentCtx)
 	return &ListenData{
 		chainID:         ethInfo.ChainID,
 		chainName:       ethInfo.NetworkName,
 		log:             log,
 		pauseTime:       pauseTime,
-		ctx:             context.Background(),
+		ctx:             ctx,
+		ctxCancelFunc:   cancelFunc,
 		rpc:             ethInfo.RPC,
 		address:         ethInfo.Address,
 		masterQ:         masterQ,
@@ -66,11 +72,22 @@ func (l *ListenData) GetNetwork() string {
 	return l.chainName
 }
 
+func (l *ListenData) Restart(parent context.Context) {
+	l.ctx, l.ctxCancelFunc = context.WithCancel(parent)
+	l.Run()
+}
+
 func (l *ListenData) Run() {
+	wg := new(sync.WaitGroup)
+	defer func() {
+		wg.Wait()
+		l.healthCheckChan <- StateInfo{
+			Name: l.chainName,
+		}
+	}()
 	var err error
 	l.clientRPC, err = ethclient.Dial(l.rpc)
 	if err != nil {
-
 		l.log.WithError(err).Error("failed to connect to node")
 		return
 	}
@@ -85,26 +102,26 @@ func (l *ListenData) Run() {
 
 	ticker := time.NewTicker(time.Duration(l.pauseTime) * time.Second)
 
-	go l.indexContractTxs()
-
+	wg.Add(1)
 	for {
 		select {
 		case <-l.ctx.Done():
-			l.healthCheckChan <- StateInfo{
-				Name: l.chainName,
-			}
+			wg.Done()
 			return
 		case <-ticker.C:
 			block, err := l.clientRPC.BlockByNumber(context.Background(), nil)
 			if err != nil {
 				l.log.WithError(err).Error(l.chainName, ": failed to get last block ")
-				return
+				l.ctxCancelFunc()
+				continue
 			}
 
 			hash := block.Hash()
 			if previewHash == hash {
 				continue
 			}
+
+			go l.indexContractTxs(wg, block)
 
 			query := ethereum.FilterQuery{
 				BlockHash: &hash,
@@ -127,8 +144,13 @@ func (l *ListenData) Run() {
 				continue
 			}
 
-			if err = l.insertTxs(l.prepareDataToInsert(l.getTxIntputsOnBlock(suitableTXs, block))); err != nil {
-				l.log.Error(errors.Wrap(err, "failed to use transaction"))
+			preapredTxs, err := l.prepareDataToInsert(l.getTxIntputsOnBlock(suitableTXs, block))
+			if err != nil {
+				l.log.WithError(err).Error("failed to  get suitable")
+				continue
+			}
+			if err = l.insertTxs(preapredTxs); err != nil {
+				l.log.WithError(err).Error("failed to use transaction")
 				continue
 			}
 
@@ -138,50 +160,28 @@ func (l *ListenData) Run() {
 	}
 }
 
-func (l *ListenData) indexContractTxs() {
-	ticker := time.NewTicker(time.Duration(l.pauseTime) * time.Second)
-	var previewHash common.Hash
-
-	for {
-		select {
-		case <-l.ctx.Done():
-			l.healthCheckChan <- StateInfo{
-				Name: l.chainName,
-			}
-			return
-		case <-ticker.C:
-			block, err := l.clientRPC.BlockByNumber(context.Background(), nil)
-			if err != nil {
-				l.log.WithError(err).Error(l.chainName, ": failed to get last block ")
-				return
-			}
-
-			hash := block.Hash()
-			if previewHash == hash {
-				continue
-			}
-
-			previewHash = hash
-
-			contractTXsOnBlock := l.filteringTx(block)
-			if len(contractTXsOnBlock) == 0 {
-				continue
-			}
-
-			l.log.Debug("Indexer: contractTXsOnBlock:  ", contractTXsOnBlock)
-
-			txs := l.prepareDataToInsert(contractTXsOnBlock)
-			l.log.Debug("Indexer: txs:  ", txs)
-
-			if err = l.insertTxs(txs); err != nil {
-				l.log.Error(errors.Wrap(err, "failed to use transaction"))
-				return
-			}
-
-			break
-		}
-
+func (l *ListenData) indexContractTxs(wg *sync.WaitGroup, block *types.Block) {
+	defer wg.Done()
+	wg.Add(1)
+	contractTXsOnBlock := l.filteringTx(block)
+	if len(contractTXsOnBlock) == 0 {
+		return
 	}
+
+	l.log.Debug("Indexer: contractTXsOnBlock:  ", contractTXsOnBlock)
+
+	txs, err := l.prepareDataToInsert(contractTXsOnBlock)
+	if err != nil {
+		l.log.WithError(err).Error("failed to  get suitable")
+		return
+	}
+	l.log.Debug("Indexer: txs:  ", txs)
+
+	if err = l.insertTxs(txs); err != nil {
+		l.log.Error(errors.Wrap(err, "failed to use transaction"))
+		return
+	}
+
 }
 
 func (l *ListenData) getTxIntputsOnBlock(txHashes []RecipientInfo, block *types.Block) map[string][]string {
@@ -232,14 +232,22 @@ func (l *ListenData) GetTxHashes(logs []types.Log) []common.Hash {
 	return result
 }
 
-func (l *ListenData) prepareDataToInsert(inputs map[string][]string) []data.Transactions {
+func (l *ListenData) prepareDataToInsert(inputs map[string][]string) ([]data.Transactions, error) {
 	response := make([]data.Transactions, 0)
 	for txHash, payload := range inputs {
+		networkTo, err := l.stringToInt32(payload[3])
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to  prepare network  to")
+		}
+		networkFrom, err := l.stringToInt32(payload[2])
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to  prepare network from")
+		}
 
 		tx := data.Transactions{
 			PaymentID:   payload[1],
-			NetworkFrom: payload[2],
-			NetworkTo:   payload[3],
+			NetworkFrom: networkFrom,
+			NetworkTo:   networkTo,
 			ValueTo:     payload[4],
 		}
 
@@ -258,7 +266,7 @@ func (l *ListenData) prepareDataToInsert(inputs map[string][]string) []data.Tran
 		response = append(response, tx)
 	}
 
-	return response
+	return response, nil
 }
 
 func (l *ListenData) insertTxs(any interface{}) error {
@@ -401,4 +409,13 @@ func (l *ListenData) setTimestamp(transaction *data.Transactions) (*data.Transac
 	transaction.TimestampTo = tx.Time()
 
 	return transaction, nil
+}
+
+func (l *ListenData) stringToInt32(str string) (int32, error) {
+	var n int32
+	if _, err := fmt.Sscan(str, &n); err != nil {
+		return -1, errors.Wrap(err, "failed to convert string to int")
+	}
+
+	return n, nil
 }

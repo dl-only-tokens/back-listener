@@ -21,8 +21,10 @@ properties:
   tx_hash_to:
     type: string
   network_from:
-    type: string
+    type: integer
+    format: int32
   network_to:
-    type: string
+    type: integer
+    format:  int32
   value_to:
     type: string

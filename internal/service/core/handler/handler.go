@@ -28,6 +28,7 @@ func NewHandler(log *logan.Entry, networker []config.NetInfo, rarimoApi *config.
 		isAutoInit:      rarimoApi.IsAutoInit,
 		txMetaData:      metaData,
 		abiPath:         chainListener.AbiPath,
+		healthCheckChan: make(chan listener.StateInfo),
 	}
 }
 
@@ -35,9 +36,10 @@ func (h *ListenerHandler) Run() {
 	go h.healthCheck()
 
 	for {
-		for l, status := range h.Listeners.data { // todo make better name
+
+		for l, status := range h.Listeners.GetCopy() {
 			if !status {
-				go l.Run()
+				go l.Restart(h.ctx)
 				h.Listeners.Store(l, true)
 			}
 		}
@@ -106,7 +108,7 @@ func (h *ListenerHandler) prepareNewListener(network string, address string) (li
 		NetworkName: network,
 	}
 
-	return listener.NewListener(h.log, h.pauseTime, info, h.masterQ, h.txMetaData, h.healthCheckChan, h.abiPath), nil
+	return listener.NewListener(h.ctx, h.log, h.pauseTime, info, h.masterQ, h.txMetaData, h.healthCheckChan, h.abiPath), nil
 }
 
 func (h *ListenerHandler) addNewListener(listener listener.Listener) {
@@ -114,16 +116,17 @@ func (h *ListenerHandler) addNewListener(listener listener.Listener) {
 }
 
 func (h *ListenerHandler) healthCheck() {
+	h.log.Debug("start health check")
 	for {
-		select {
-		case chanStatus := <-h.healthCheckChan:
-			h.Listeners.Store(h.findByNetwork(chanStatus.Name), false)
-		}
+		chanStatus := <-h.healthCheckChan
+		h.log.Debug("DONE: ", chanStatus.Name)
+		h.Listeners.Store(h.findByNetwork(chanStatus.Name), false)
+
 	}
 }
 
 func (h *ListenerHandler) findByNetwork(network string) listener.Listener {
-	for l := range h.Listeners.data {
+	for l := range h.Listeners.GetCopy() {
 		if l.GetNetwork() == network {
 			return l
 		}

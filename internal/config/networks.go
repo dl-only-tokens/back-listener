@@ -16,10 +16,11 @@ type Network struct {
 }
 
 type NetInfo struct {
-	Name    string `fig:"name"`
-	Address string `fig:"address"`
-	Rpc     string `fig:"rpc"`
-	ChainID string `fiq:"chain_id"`
+	Name       string `fig:"name"`
+	Address    string `fig:"address"`
+	Rpc        string `fig:"rpc"`
+	StartBlock uint64 `fiq:"start_block"`
+	ChainID    int32  `fiq:"chain_id"`
 }
 
 func NewNetworkConfiger(getter kv.Getter) NetworkConfiger {

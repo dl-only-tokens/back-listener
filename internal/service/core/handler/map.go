@@ -28,3 +28,9 @@ func (c *ListenersMap) Store(key listener.Listener, value bool) {
 	defer c.mx.Unlock()
 	c.data[key] = value
 }
+
+func (c *ListenersMap) GetCopy() map[listener.Listener]bool {
+	c.mx.Lock()
+	defer c.mx.Unlock()
+	return c.data
+}
