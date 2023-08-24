@@ -9,6 +9,7 @@ import (
 	"github.com/dl-only-tokens/back-listener/internal/service/core/rarimo"
 	"github.com/pkg/errors"
 	"gitlab.com/distributed_lab/logan/v3"
+	"math/big"
 	"sync"
 )
 
@@ -79,7 +80,15 @@ func (h *ListenerHandler) autoInitContracts() error {
 func (h *ListenerHandler) initListeners(data []config.NetInfo) error {
 	for _, network := range data {
 
-		preparedListener, err := h.prepareNewListener(network.Name, network.Address)
+		preparedListener, err := h.prepareNewListener(network.Name, network.Address, false)
+		if err != nil {
+			h.log.WithError(err).Error("failed to connect to  rpc")
+			continue
+		}
+
+		h.addNewListener(preparedListener)
+
+		preparedListener, err = h.prepareNewListener(network.Name, network.Address, true)
 		if err != nil {
 			h.log.WithError(err).Error("failed to connect to  rpc")
 			continue
@@ -91,7 +100,7 @@ func (h *ListenerHandler) initListeners(data []config.NetInfo) error {
 	return nil
 }
 
-func (h *ListenerHandler) prepareNewListener(network string, address string) (listener.Listener, error) {
+func (h *ListenerHandler) prepareNewListener(network string, address string, isIndexer bool) (listener.Listener, error) {
 	netInfo := h.findNetwork(network)
 	if netInfo == nil {
 		return nil, errors.New(fmt.Sprintf("unsupported network: %s", network))
@@ -108,7 +117,13 @@ func (h *ListenerHandler) prepareNewListener(network string, address string) (li
 		NetworkName: network,
 	}
 
-	return listener.NewListener(h.ctx, h.log, h.pauseTime, info, h.masterQ, h.txMetaData, h.healthCheckChan, h.abiPath, nil), nil
+	var startBlock *big.Int
+
+	if isIndexer {
+		network = fmt.Sprint(network, "_indexer")
+		startBlock = big.NewInt(int64(netInfo.StartBlock))
+	}
+	return listener.NewListener(h.ctx, h.log, h.pauseTime, info, h.masterQ, h.txMetaData, h.healthCheckChan, h.abiPath, startBlock, isIndexer), nil
 }
 
 func (h *ListenerHandler) addNewListener(listener listener.Listener) {
@@ -117,8 +132,11 @@ func (h *ListenerHandler) addNewListener(listener listener.Listener) {
 
 func (h *ListenerHandler) healthCheck() {
 	for {
-
 		failedListeners := <-h.healthCheckChan
+		if failedListeners.IsIndexer() {
+			continue
+		}
+
 		go failedListeners.Restart(h.ctx)
 	}
 }

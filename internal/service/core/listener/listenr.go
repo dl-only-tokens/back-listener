@@ -25,6 +25,7 @@ type Listener interface {
 	Run()
 	GetNetwork() string
 	Restart(parent context.Context)
+	IsIndexer() bool
 }
 
 type ListenData struct {
@@ -43,6 +44,7 @@ type ListenData struct {
 	clientRPC         *ethclient.Client
 	lastListenedBlock *big.Int
 	lastBlock         uint64
+	isIndexer         bool
 }
 
 type EthInfo struct {
@@ -52,7 +54,7 @@ type EthInfo struct {
 	NetworkName string
 }
 
-func NewListener(parentCtx context.Context, log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.MasterQ, metaData *config.MetaData, healthCheckChan chan Listener, abiPath string, lastBlock *big.Int) Listener {
+func NewListener(parentCtx context.Context, log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.MasterQ, metaData *config.MetaData, healthCheckChan chan Listener, abiPath string, lastBlock *big.Int, isIndexer bool) Listener {
 	ctx, cancelFunc := context.WithCancel(parentCtx)
 	return &ListenData{
 		chainID:           ethInfo.ChainID,
@@ -68,11 +70,16 @@ func NewListener(parentCtx context.Context, log *logan.Entry, pauseTime int, eth
 		healthCheckChan:   healthCheckChan,
 		abiPath:           abiPath,
 		lastListenedBlock: lastBlock,
+		isIndexer:         isIndexer,
 	}
 }
 
 func (l *ListenData) GetNetwork() string {
 	return l.chainName
+}
+
+func (l *ListenData) IsIndexer() bool {
+	return l.isIndexer
 }
 
 func (l *ListenData) Restart(parent context.Context) {
@@ -109,7 +116,10 @@ func (l *ListenData) run(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			ticker.Reset(tickerTime)
+			ticker.Reset(1 * time.Second)
+			if !l.isIndexer {
+				ticker.Reset(tickerTime)
+			}
 			l.lastBlock, err = l.clientRPC.BlockNumber(ctx)
 			if err != nil {
 				l.log.WithError(err).Error(l.chainName, ": failed to get number of blocks")
@@ -117,16 +127,25 @@ func (l *ListenData) run(ctx context.Context) {
 				continue
 			}
 
+			if l.isIndexer {
+				l.log.Debug("INDEXER ", l.chainName)
+			}
+
 			if l.lastListenedBlock == nil {
 				l.lastListenedBlock = big.NewInt(int64(l.lastBlock))
 			}
 
 			for l.lastBlock >= l.lastListenedBlock.Uint64() {
+
 				block, err := l.clientRPC.BlockByNumber(context.Background(), l.lastListenedBlock)
 				if err != nil {
 					l.log.WithError(err).Error(l.chainName, ": failed to get last block ")
 					l.ctxCancelFunc()
 					continue
+				}
+
+				if l.isIndexer {
+					l.log.Debug("last block:   ", l.lastListenedBlock.String(), "   ", l.chainName)
 				}
 
 				l.lastListenedBlock = l.lastListenedBlock.Add(l.lastListenedBlock, big.NewInt(1))
@@ -168,6 +187,9 @@ func (l *ListenData) run(ctx context.Context) {
 					l.log.WithError(err).Error("failed to use transaction")
 					continue
 				}
+			}
+			if l.isIndexer {
+				return
 			}
 		}
 	}
