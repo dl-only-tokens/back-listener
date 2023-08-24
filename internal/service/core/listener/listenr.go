@@ -102,8 +102,8 @@ func (l *ListenData) run(ctx context.Context) {
 	var previewHash common.Hash
 	var err error
 
-	tickerTime := time.Duration(l.pauseTime) * 40 * time.Second
-	ticker := time.NewTicker(tickerTime)
+	tickerTime := time.Duration(l.pauseTime) * time.Second
+	ticker := time.NewTicker(1 * time.Second)
 	for {
 		select {
 		case <-ctx.Done():
