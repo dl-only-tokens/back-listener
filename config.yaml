@@ -39,7 +39,7 @@ meta_data:
   footer: "3b"
 
 chain_listener:
-  pause_time: 500
+  pause_time: 10000
   abi_path: "/fgo/src/github.com/dl-only-tokens/back-listener/pkg/contract/erc20/erc20.abi"
 
 cop:

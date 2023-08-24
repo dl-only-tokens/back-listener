@@ -9,6 +9,7 @@ import (
 	"github.com/dl-only-tokens/back-listener/internal/service/core/rarimo"
 	"github.com/pkg/errors"
 	"gitlab.com/distributed_lab/logan/v3"
+	"sync"
 )
 
 type Handler interface {
@@ -18,7 +19,7 @@ type Handler interface {
 
 func NewHandler(log *logan.Entry, networker []config.NetInfo, rarimoApi *config.API, masterQ data.MasterQ, metaData *config.MetaData, chainListener *config.ChainListener) Handler {
 	return &ListenerHandler{
-		Listeners:       NewCounters(),
+		Listeners:       make([]listener.Listener, 0),
 		ctx:             context.Background(),
 		log:             log,
 		supportNetworks: networker,
@@ -28,23 +29,21 @@ func NewHandler(log *logan.Entry, networker []config.NetInfo, rarimoApi *config.
 		isAutoInit:      rarimoApi.IsAutoInit,
 		txMetaData:      metaData,
 		abiPath:         chainListener.AbiPath,
-		healthCheckChan: make(chan listener.StateInfo),
+		healthCheckChan: make(chan listener.Listener),
 	}
 }
 
 func (h *ListenerHandler) Run() {
-	go h.healthCheck()
+	wg := new(sync.WaitGroup)
+	wg.Add(1)
 
-	for {
-
-		for l, status := range h.Listeners.GetCopy() {
-			if !status {
-				go l.Restart(h.ctx)
-				h.Listeners.Store(l, true)
-			}
-		}
+	for _, l := range h.Listeners {
+		go l.Restart(h.ctx)
 	}
 
+	go h.healthCheck()
+
+	wg.Wait()
 }
 
 func (h *ListenerHandler) Init() error {
@@ -79,6 +78,7 @@ func (h *ListenerHandler) autoInitContracts() error {
 
 func (h *ListenerHandler) initListeners(data []config.NetInfo) error {
 	for _, network := range data {
+
 		preparedListener, err := h.prepareNewListener(network.Name, network.Address)
 		if err != nil {
 			h.log.WithError(err).Error("failed to connect to  rpc")
@@ -108,31 +108,19 @@ func (h *ListenerHandler) prepareNewListener(network string, address string) (li
 		NetworkName: network,
 	}
 
-	return listener.NewListener(h.ctx, h.log, h.pauseTime, info, h.masterQ, h.txMetaData, h.healthCheckChan, h.abiPath), nil
+	return listener.NewListener(h.ctx, h.log, h.pauseTime, info, h.masterQ, h.txMetaData, h.healthCheckChan, h.abiPath, nil), nil
 }
 
 func (h *ListenerHandler) addNewListener(listener listener.Listener) {
-	h.Listeners.Store(listener, false)
+	h.Listeners = append(h.Listeners, listener)
 }
 
 func (h *ListenerHandler) healthCheck() {
-	h.log.Debug("start health check")
 	for {
-		chanStatus := <-h.healthCheckChan
-		h.log.Debug("DONE: ", chanStatus.Name)
-		h.Listeners.Store(h.findByNetwork(chanStatus.Name), false)
 
+		failedListeners := <-h.healthCheckChan
+		go failedListeners.Restart(h.ctx)
 	}
-}
-
-func (h *ListenerHandler) findByNetwork(network string) listener.Listener {
-	for l := range h.Listeners.GetCopy() {
-		if l.GetNetwork() == network {
-			return l
-		}
-	}
-
-	return nil
 }
 
 func (h *ListenerHandler) findNetwork(network string) *config.NetInfo {

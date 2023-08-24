@@ -9,6 +9,7 @@ required:
   - network_from
   - network_to
   - value_to
+  - timestamp
 properties:
   payment_id:
     type: string
@@ -27,4 +28,6 @@ properties:
     type: integer
     format:  int32
   value_to:
+    type: string
+  timestamp:
     type: string

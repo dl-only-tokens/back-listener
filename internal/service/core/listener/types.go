@@ -12,7 +12,8 @@ type TxInfo struct {
 }
 
 type StateInfo struct {
-	Name string
+	Name      string
+	LastBlock uint64
 }
 
 type RecipientInfo struct {

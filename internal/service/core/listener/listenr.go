@@ -13,11 +13,11 @@ import (
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/pkg/errors"
 	"gitlab.com/distributed_lab/logan/v3"
+	"gitlab.com/distributed_lab/logan/v3/errors"
+	"math/big"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -38,9 +38,10 @@ type ListenData struct {
 	address         string
 	masterQ         data.MasterQ
 	txMetaData      *config.MetaData
-	healthCheckChan chan StateInfo
+	healthCheckChan chan Listener
 	abiPath         string
 	clientRPC       *ethclient.Client
+	lastBlock       *big.Int
 }
 
 type EthInfo struct {
@@ -50,7 +51,7 @@ type EthInfo struct {
 	NetworkName string
 }
 
-func NewListener(parentCtx context.Context, log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.MasterQ, metaData *config.MetaData, healthCheckChan chan StateInfo, abiPath string) Listener {
+func NewListener(parentCtx context.Context, log *logan.Entry, pauseTime int, ethInfo EthInfo, masterQ data.MasterQ, metaData *config.MetaData, healthCheckChan chan Listener, abiPath string, lastBlock *big.Int) Listener {
 	ctx, cancelFunc := context.WithCancel(parentCtx)
 	return &ListenData{
 		chainID:         ethInfo.ChainID,
@@ -65,6 +66,7 @@ func NewListener(parentCtx context.Context, log *logan.Entry, pauseTime int, eth
 		txMetaData:      metaData,
 		healthCheckChan: healthCheckChan,
 		abiPath:         abiPath,
+		lastBlock:       lastBlock,
 	}
 }
 
@@ -74,42 +76,39 @@ func (l *ListenData) GetNetwork() string {
 
 func (l *ListenData) Restart(parent context.Context) {
 	l.ctx, l.ctxCancelFunc = context.WithCancel(parent)
+	l.log.Debug("restart")
 	l.Run()
 }
 
 func (l *ListenData) Run() {
-	wg := new(sync.WaitGroup)
 	defer func() {
-		wg.Wait()
-		l.healthCheckChan <- StateInfo{
-			Name: l.chainName,
-		}
+		l.healthCheckChan <- l
+
 	}()
 	var err error
 	l.clientRPC, err = ethclient.Dial(l.rpc)
 	if err != nil {
-		l.log.WithError(err).Error("failed to connect to node")
+		l.log.WithError(err).Error("failed to failed to connect to node")
 		return
 	}
 
+	l.run(l.ctx)
+
+}
+
+func (l *ListenData) run(ctx context.Context) {
 	contractAddress := common.HexToAddress(l.address)
-	if err != nil {
-		l.log.WithError(err).Error("failed to prepare address")
-		return
-	}
-
 	var previewHash common.Hash
 
-	ticker := time.NewTicker(time.Duration(l.pauseTime) * time.Second)
-
-	wg.Add(1)
+	tickerTime := time.Duration(l.pauseTime) * 25 * time.Second
+	ticker := time.NewTicker(tickerTime)
 	for {
 		select {
-		case <-l.ctx.Done():
-			wg.Done()
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			block, err := l.clientRPC.BlockByNumber(context.Background(), nil)
+			ticker.Reset(tickerTime)
+			block, err := l.clientRPC.BlockByNumber(context.Background(), l.lastBlock)
 			if err != nil {
 				l.log.WithError(err).Error(l.chainName, ": failed to get last block ")
 				l.ctxCancelFunc()
@@ -117,11 +116,12 @@ func (l *ListenData) Run() {
 			}
 
 			hash := block.Hash()
+			l.log.Debug("hash: ", hash)
 			if previewHash == hash {
 				continue
 			}
 
-			go l.indexContractTxs(wg, block)
+			go l.indexContractTxs(block)
 
 			query := ethereum.FilterQuery{
 				BlockHash: &hash,
@@ -153,16 +153,13 @@ func (l *ListenData) Run() {
 				l.log.WithError(err).Error("failed to use transaction")
 				continue
 			}
-
-			break
 		}
 
 	}
+
 }
 
-func (l *ListenData) indexContractTxs(wg *sync.WaitGroup, block *types.Block) {
-	defer wg.Done()
-	wg.Add(1)
+func (l *ListenData) indexContractTxs(block *types.Block) {
 	contractTXsOnBlock := l.filteringTx(block)
 	if len(contractTXsOnBlock) == 0 {
 		return

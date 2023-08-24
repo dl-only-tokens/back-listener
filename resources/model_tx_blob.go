@@ -10,6 +10,7 @@ type TxBlob struct {
 	PaymentId   string `json:"payment_id"`
 	Recipient   string `json:"recipient"`
 	Sender      string `json:"sender"`
+	Timestamp   string `json:"timestamp"`
 	TxHashFrom  string `json:"tx_hash_from"`
 	TxHashTo    string `json:"tx_hash_to"`
 	ValueTo     string `json:"value_to"`

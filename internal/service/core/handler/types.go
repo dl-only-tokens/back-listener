@@ -13,12 +13,12 @@ const (
 )
 
 type ListenerHandler struct {
-	Listeners       *ListenersMap
+	Listeners       []listener.Listener
 	supportNetworks []config.NetInfo
 	ctx             context.Context
 	log             *logan.Entry
 	pauseTime       int
-	healthCheckChan chan listener.StateInfo
+	healthCheckChan chan listener.Listener
 	rarimoAPI       string
 	masterQ         data.MasterQ
 	isAutoInit      bool
