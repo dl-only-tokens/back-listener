@@ -6,7 +6,6 @@ import (
 	"github.com/dl-only-tokens/back-listener/internal/config"
 	"github.com/dl-only-tokens/back-listener/internal/data"
 	"github.com/dl-only-tokens/back-listener/internal/service/core/listener"
-	"github.com/dl-only-tokens/back-listener/internal/service/core/rarimo"
 	"github.com/pkg/errors"
 	"gitlab.com/distributed_lab/logan/v3"
 	"math/big"
@@ -18,16 +17,14 @@ type Handler interface {
 	Init() error
 }
 
-func NewHandler(log *logan.Entry, networker []config.NetInfo, rarimoApi *config.API, masterQ data.MasterQ, metaData *config.MetaData, chainListener *config.ChainListener) Handler {
+func NewHandler(log *logan.Entry, networker []config.NetInfo, masterQ data.MasterQ, metaData *config.MetaData, chainListener *config.ChainListener) Handler {
 	return &ListenerHandler{
 		Listeners:       make([]listener.Listener, 0),
 		ctx:             context.Background(),
 		log:             log,
 		supportNetworks: networker,
 		pauseTime:       chainListener.PauseTime,
-		rarimoAPI:       rarimoApi.Endpoint,
 		masterQ:         masterQ,
-		isAutoInit:      rarimoApi.IsAutoInit,
 		txMetaData:      metaData,
 		abiPath:         chainListener.AbiPath,
 		healthCheckChan: make(chan listener.Listener),
@@ -48,13 +45,6 @@ func (h *ListenerHandler) Run() {
 }
 
 func (h *ListenerHandler) Init() error {
-	if h.isAutoInit {
-		if err := h.autoInitContracts(); err != nil {
-			return errors.Wrap(err, "failed to do auto  init")
-		}
-		return nil
-	}
-
 	if err := h.initListeners(h.supportNetworks); err != nil {
 		return errors.Wrap(err, "failed to do auto  init")
 	}
@@ -63,24 +53,10 @@ func (h *ListenerHandler) Init() error {
 
 }
 
-func (h *ListenerHandler) autoInitContracts() error {
-	rarimoHandler := rarimo.NewRarimoHandler(h.rarimoAPI)
-	networks, err := rarimoHandler.GetContractsAddresses()
-	if err != nil {
-		return errors.Wrap(err, "failed to get contract list")
-	}
-
-	if err = h.initListeners(networks); err != nil {
-		return errors.Wrap(err, "failed to initListeners")
-	}
-
-	return nil
-}
-
 func (h *ListenerHandler) initListeners(data []config.NetInfo) error {
 	for _, network := range data {
 
-		preparedListener, err := h.prepareNewListener(network.Name, network.Address, false)
+		preparedListener, err := h.prepareNewListener(network.Name, false)
 		if err != nil {
 			h.log.WithError(err).Error("failed to connect to  rpc")
 			continue
@@ -88,7 +64,7 @@ func (h *ListenerHandler) initListeners(data []config.NetInfo) error {
 
 		h.addNewListener(preparedListener)
 
-		preparedListener, err = h.prepareNewListener(network.Name, network.Address, true)
+		preparedListener, err = h.prepareNewListener(network.Name, true)
 		if err != nil {
 			h.log.WithError(err).Error("failed to connect to  rpc")
 			continue
@@ -100,18 +76,13 @@ func (h *ListenerHandler) initListeners(data []config.NetInfo) error {
 	return nil
 }
 
-func (h *ListenerHandler) prepareNewListener(network string, address string, isIndexer bool) (listener.Listener, error) {
+func (h *ListenerHandler) prepareNewListener(network string, isIndexer bool) (listener.Listener, error) {
 	netInfo := h.findNetwork(network)
 	if netInfo == nil {
 		return nil, errors.New(fmt.Sprintf("unsupported network: %s", network))
 	}
 
-	if len(address) == 0 {
-		return nil, errors.New("address is empty")
-	}
-
 	info := listener.EthInfo{
-		Address:     address,
 		RPC:         netInfo.Rpc,
 		ChainID:     netInfo.ChainID,
 		NetworkName: network,

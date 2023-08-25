@@ -2,8 +2,6 @@ package listener
 
 import "github.com/ethereum/go-ethereum/common"
 
-const receiverPositionOnEvent = 5
-
 type TxInfo struct {
 	Recipient   string
 	PaymentID   string

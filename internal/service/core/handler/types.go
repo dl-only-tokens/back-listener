@@ -8,10 +8,6 @@ import (
 	"gitlab.com/distributed_lab/logan/v3"
 )
 
-const (
-	ChanIsClosed = iota
-)
-
 type ListenerHandler struct {
 	Listeners       []listener.Listener
 	supportNetworks []config.NetInfo
@@ -21,7 +17,6 @@ type ListenerHandler struct {
 	healthCheckChan chan listener.Listener
 	rarimoAPI       string
 	masterQ         data.MasterQ
-	isAutoInit      bool
 	txMetaData      *config.MetaData
 	abiPath         string
 }

@@ -96,6 +96,12 @@ func (q *TransactionsQ) FilterByNotReady() data.TransactionsQ {
 
 	return q
 }
+func (q *TransactionsQ) FilterByNetworkFrom(networkFrom int32) data.TransactionsQ {
+	q.sql = q.sql.Where(sq.Eq{txHashFromField: networkFrom})
+	q.upd = q.upd.Where(sq.Eq{txHashFromField: networkFrom})
+
+	return q
+}
 
 func (q *TransactionsQ) Page(pageParams pgdb.OffsetPageParams) data.TransactionsQ {
 	q.sql = pageParams.ApplyTo(q.sql, idField)

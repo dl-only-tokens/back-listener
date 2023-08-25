@@ -23,7 +23,7 @@ func (s *service) run() error {
 	s.log.Info("Service started")
 
 	r := s.router()
-	listenHandler := handler.NewHandler(s.log, s.cfg.Network().NetInfoList, s.cfg.API(), pg.NewMasterQ(s.cfg.DB()), s.cfg.MetaData(), s.cfg.ChainListener())
+	listenHandler := handler.NewHandler(s.log, s.cfg.Network().NetInfoList, pg.NewMasterQ(s.cfg.DB()), s.cfg.MetaData(), s.cfg.ChainListener())
 	if err := listenHandler.Init(); err != nil {
 		return errors.Wrap(err, "failed to init listeners")
 	}

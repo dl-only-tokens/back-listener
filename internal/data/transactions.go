@@ -8,13 +8,14 @@ import (
 type TransactionsQ interface {
 	New() TransactionsQ
 	Insert(data *Transactions) error
-	FilterByRecipient(address string) TransactionsQ
 	Select() ([]Transactions, error)
 	Page(pageParams pgdb.OffsetPageParams) TransactionsQ
-	FilterByPaymentID(paymentID string) TransactionsQ
 	Update(data *Transactions) error
 	FilterByReady() TransactionsQ
 	FilterByNotReady() TransactionsQ
+	FilterByNetworkFrom(networkFrom int32) TransactionsQ
+	FilterByRecipient(address string) TransactionsQ
+	FilterByPaymentID(paymentID string) TransactionsQ
 }
 
 type Transactions struct {
@@ -26,5 +27,6 @@ type Transactions struct {
 	Recipient   string    `db:"recipient" structs:"recipient"`
 	Sender      string    `db:"sender" structs:"sender"`
 	ValueTo     string    `db:"value_to" structs:"value_to"`
+	Currency    string    `db:"currency" structs:"currency"`
 	TimestampTo time.Time `db:"timestamp_to" structs:"timestamp_to"`
 }

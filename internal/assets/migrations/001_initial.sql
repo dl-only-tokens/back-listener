@@ -9,7 +9,8 @@ CREATE TABLE transactions (
     network_from  VARCHAR(10),
     value_to numeric,
     timestamp_to timestamp,
-    PRIMARY KEY (tx_hash_from,  network_from)
+    currency  VARCHAR(10),
+    PRIMARY KEY (payment_id)
 );
 
 

@@ -13,7 +13,7 @@ import (
 )
 
 // driverValue - converts interface into db supported type
-func driverValue(data interface{}) (driver.Value, error) {
+func mydriverValue(data interface{}) (driver.Value, error) {
 	data, err := json.Marshal(data)
 	if err != nil {
 		return nil, errors.New("failed to marshal details")
