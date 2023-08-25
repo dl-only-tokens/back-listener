@@ -5,6 +5,7 @@
 package resources
 
 type TxBlob struct {
+	Currency    string `json:"currency"`
 	NetworkFrom int32  `json:"network_from"`
 	NetworkTo   int32  `json:"network_to"`
 	PaymentId   string `json:"payment_id"`

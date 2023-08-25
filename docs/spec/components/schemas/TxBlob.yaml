@@ -10,6 +10,7 @@ required:
   - network_to
   - value_to
   - timestamp
+  - currency
 properties:
   payment_id:
     type: string
@@ -30,4 +31,6 @@ properties:
   value_to:
     type: string
   timestamp:
+    type: string
+  currency:
     type: string

@@ -48,6 +48,7 @@ func prepareResponse(txs []data.Transactions) resources.GetTxListResponse {
 			TxHashFrom:  tx.TxHashFrom,
 			ValueTo:     tx.ValueTo,
 			Timestamp:   tx.TimestampTo.String(),
+			Currency:    tx.Currency,
 		}
 		txBlobs = append(txBlobs, blob)
 	}
