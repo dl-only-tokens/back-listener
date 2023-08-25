@@ -30,9 +30,5 @@ import:
     to: /usr/local/bin/back-listener
     after: setup
 
-  - image: builder
-    add: /go/src/github.com/dl-only-tokens/back-listener/pkg
-    to: /usr/local/bin/pkg/
-    after: setup
 
 
