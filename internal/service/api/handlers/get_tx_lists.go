@@ -4,10 +4,12 @@ import (
 	"database/sql"
 	"errors"
 	"github.com/dl-only-tokens/back-listener/internal/data"
+	"github.com/dl-only-tokens/back-listener/internal/data/pg"
 	"github.com/dl-only-tokens/back-listener/internal/service/api/requests"
 	"github.com/dl-only-tokens/back-listener/resources"
 	"gitlab.com/distributed_lab/ape"
 	"gitlab.com/distributed_lab/ape/problems"
+	"gitlab.com/distributed_lab/kit/pgdb"
 	"net/http"
 )
 
@@ -19,7 +21,7 @@ func GetTxLists(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	txs, err := MasterQ(r).TransactionsQ().New().FilterByRecipient(req.Address).Select()
+	txs, err := MasterQ(r).TransactionsQ().New().FilterByRecipient(req.Address).OrderBy(pg.TimestampField, pgdb.OrderTypeDesc).Select()
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			Log(r).WithError(err).Error("failed to empty select list")

@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"gitlab.com/distributed_lab/urlval"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -20,7 +21,7 @@ func NewGetTXsListRequest(r *http.Request) (GetTXsListRequest, error) {
 	if err := urlval.Decode(r.URL.Query(), &request); err != nil {
 		return request, errors.Wrap(err, "failed to decode query")
 	}
-	request.Address = chi.URLParam(r, AddressPathParam)
+	request.Address = strings.ToLower(chi.URLParam(r, AddressPathParam))
 
 	return request, nil
 }

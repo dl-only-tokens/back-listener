@@ -16,6 +16,7 @@ type TransactionsQ interface {
 	FilterByNetworkFrom(networkFrom int32) TransactionsQ
 	FilterByRecipient(address string) TransactionsQ
 	FilterByPaymentID(paymentID string) TransactionsQ
+	OrderBy(column, order string) TransactionsQ
 }
 
 type Transactions struct {

@@ -238,7 +238,7 @@ func (l *ListenData) prepareDataToInsert(inputs map[string][]string) ([]data.Tra
 		response = append(response, tx)
 	}
 
-	return response, nil
+	return l.txsToLowerCase(response), nil
 }
 
 func (l *ListenData) insertTxs(txs []data.Transactions, blockTime uint64) error {
@@ -275,14 +275,6 @@ func (l *ListenData) insertTxs(txs []data.Transactions, blockTime uint64) error 
 	return nil
 }
 
-func (l *ListenData) interfaceToTx(any interface{}) (*[]data.Transactions, error) {
-	if convertedData, ok := any.([]data.Transactions); ok {
-		return &convertedData, nil
-	}
-
-	return nil, errors.New("data cant be converted to TX")
-}
-
 func (l *ListenData) filteringTx(block *types.Block) (map[string][]string, error) {
 	result := make(map[string][]string)
 	for _, evmTx := range block.Transactions() {
@@ -299,7 +291,6 @@ func (l *ListenData) filteringTx(block *types.Block) (map[string][]string, error
 }
 
 func (l *ListenData) packTX(firstTX data.Transactions, secondTX data.Transactions) *data.Transactions {
-
 	result := data.Transactions{}
 
 	result.TxHashTo = secondTX.TxHashTo
@@ -321,6 +312,24 @@ func (l *ListenData) packTX(firstTX data.Transactions, secondTX data.Transaction
 	result.NetworkFrom = secondTX.NetworkFrom
 
 	return &result
+}
+
+func (l *ListenData) txsToLowerCase(data []data.Transactions) []data.Transactions {
+	for _, tx := range data {
+		if len(tx.Sender) > 0 {
+			strings.ToLower(tx.Sender)
+		}
+		if len(tx.Recipient) > 0 {
+			strings.ToLower(tx.Recipient)
+		}
+		if len(tx.TxHashTo) > 0 {
+			strings.ToLower(tx.TxHashTo)
+		}
+		if len(tx.TxHashFrom) > 0 {
+			strings.ToLower(tx.TxHashFrom)
+		}
+	}
+	return data
 }
 
 func (l *ListenData) stringToInt32(str string) (int32, error) {

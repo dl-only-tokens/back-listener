@@ -12,22 +12,13 @@ networks:
   keys:
     - name: 'Goerli'
       chain_id: 5
+      start_block: 9600199
       rpc:  "https://goerli.infura.io/v3/"
-    - name: 'Fuji'
-      chain_id: 43113
-      rpc:  "https://avalanche-fuji.infura.io/v3/"
     - name: 'BSC Testnet'
       chain_id: 97
+      start_block: 9600199
       rpc:  "https://data-seed-prebsc-2-s3.binance.org:8545/"
-    - name: 'Ethereum'
-      chain_id: 1
-      rpc: "https://mainnet.infura.io/v3/"
-    - name: 'Avalanche'
-      chain_id: 43114
-      rpc: "https://avalanche-mainnet.infura.io/v3/"
-    - name: 'Sepolia'
-      chain_id: 11155111
-      rpc:  "https://sepolia.infura.io/v3/"
+
 
 
 meta_data:
@@ -36,7 +27,6 @@ meta_data:
 
 chain_listener:
   pause_time: 10000
-  abi_path: "/fgo/src/github.com/dl-only-tokens/back-listener/pkg/contract/erc20/erc20.abi"
 
 cop:
   disabled: true

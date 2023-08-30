@@ -12,11 +12,11 @@ import (
 const transactionTableName = "transactions"
 
 const (
-	idField         = "id"
-	recipientField  = "recipient"
-	paymentIDField  = "payment_id"
-	txHashFromField = "tx_hash_from"
-	txHashToField   = "tx_hash_to"
+	RecipientField  = "recipient"
+	PaymentIDField  = "payment_id"
+	TxHashFromField = "tx_hash_from"
+	TxHashToField   = "tx_hash_to"
+	TimestampField  = "timestamp_to"
 )
 
 func NewTransactionsQ(db *pgdb.DB) data.TransactionsQ {
@@ -67,44 +67,51 @@ func (q *TransactionsQ) Insert(value *data.Transactions) error {
 }
 
 func (q *TransactionsQ) FilterByRecipient(address string) data.TransactionsQ {
-	q.sql = q.sql.Where(sq.Eq{recipientField: address})
-	q.upd = q.upd.Where(sq.Eq{recipientField: address})
+	q.sql = q.sql.Where(sq.Eq{RecipientField: address})
+	q.upd = q.upd.Where(sq.Eq{RecipientField: address})
 
 	return q
 }
 
 func (q *TransactionsQ) FilterByPaymentID(paymentID string) data.TransactionsQ {
-	q.sql = q.sql.Where(sq.Eq{paymentIDField: paymentID})
-	q.upd = q.upd.Where(sq.Eq{paymentIDField: paymentID})
+	q.sql = q.sql.Where(sq.Eq{PaymentIDField: paymentID})
+	q.upd = q.upd.Where(sq.Eq{PaymentIDField: paymentID})
 
 	return q
 }
 
 func (q *TransactionsQ) FilterByReady() data.TransactionsQ {
-	q.sql = q.sql.Where(sq.NotEq{txHashToField: ""})
-	q.upd = q.upd.Where(sq.NotEq{txHashToField: ""})
+	q.sql = q.sql.Where(sq.NotEq{TxHashToField: ""})
+	q.upd = q.upd.Where(sq.NotEq{TxHashToField: ""})
 
-	q.sql = q.sql.Where(sq.NotEq{txHashFromField: ""})
-	q.upd = q.upd.Where(sq.NotEq{txHashFromField: ""})
+	q.sql = q.sql.Where(sq.NotEq{TxHashFromField: ""})
+	q.upd = q.upd.Where(sq.NotEq{TxHashFromField: ""})
 
 	return q
 }
 
 func (q *TransactionsQ) FilterByNotReady() data.TransactionsQ {
-	q.sql = q.sql.Where(sq.Eq{txHashToField: ""})
-	q.upd = q.upd.Where(sq.Eq{txHashToField: ""})
+	q.sql = q.sql.Where(sq.Eq{TxHashToField: ""})
+	q.upd = q.upd.Where(sq.Eq{TxHashToField: ""})
 
 	return q
 }
 func (q *TransactionsQ) FilterByNetworkFrom(networkFrom int32) data.TransactionsQ {
-	q.sql = q.sql.Where(sq.Eq{txHashFromField: networkFrom})
-	q.upd = q.upd.Where(sq.Eq{txHashFromField: networkFrom})
+	q.sql = q.sql.Where(sq.Eq{TxHashFromField: networkFrom})
+	q.upd = q.upd.Where(sq.Eq{TxHashFromField: networkFrom})
+
+	return q
+}
+
+func (q *TransactionsQ) OrderBy(column, order string) data.TransactionsQ {
+	q.sql = q.sql.OrderBy(fmt.Sprintf("%s %s", column, order))
+	q.upd = q.upd.OrderBy(fmt.Sprintf("%s %s", column, order))
 
 	return q
 }
 
 func (q *TransactionsQ) Page(pageParams pgdb.OffsetPageParams) data.TransactionsQ {
-	q.sql = pageParams.ApplyTo(q.sql, idField)
+	q.sql = pageParams.ApplyTo(q.sql, PaymentIDField)
 
 	return q
 }
