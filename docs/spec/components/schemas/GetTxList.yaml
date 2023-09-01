@@ -1,0 +1,24 @@
+allOf:
+  - $ref: '#/components/schemas/GetTxListKey'
+  - type: object
+    required:
+      - attributes
+      - relationships
+    properties:
+      attributes:
+        type: object
+        required:
+          - transactions
+        properties:
+          transactions:
+            type: array
+            items:
+              type: object
+              $ref: '#/components/schemas/TxBlob'
+      relationships:
+        type: object
+        required:
+          - data
+        properties:
+          data:
+            $ref: '#/components/schemas/TxBlobRelationship'
