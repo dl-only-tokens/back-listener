@@ -100,6 +100,7 @@ func (l *ListenData) run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
+			l.log.WithField("id", l.chainID).WithField("is indexer", l.isIndexer).Debug("Context done")
 			return
 		case <-ticker.C:
 			ticker.Reset(1 * time.Second)
@@ -113,28 +114,26 @@ func (l *ListenData) run(ctx context.Context) {
 				continue
 			}
 
-			if l.isIndexer {
-				l.log.Debug("INDEXER ", l.chainName)
-			}
-
 			if l.lastListenedBlock == nil {
+				l.log.WithField("id", l.chainID).WithField("is indexer", l.isIndexer).Debug("Init  last  listened  block")
 				l.lastListenedBlock = big.NewInt(int64(l.lastBlock))
 			}
 
 			for l.lastBlock >= l.lastListenedBlock.Uint64() {
-				block, err := l.clientRPC.BlockByNumber(context.Background(), l.lastListenedBlock)
+				block, err := l.clientRPC.BlockByNumber(ctx, l.lastListenedBlock)
 				if err != nil {
-					l.log.WithError(err).Error(l.chainName, ": failed to get last block ")
+					l.log.WithError(err).WithField("id", l.chainID).WithField("is indexer", l.isIndexer).Error("failed to get last block ")
 					l.ctxCancelFunc()
 					continue
 				}
 
 				l.lastListenedBlock = l.lastListenedBlock.Add(l.lastListenedBlock, big.NewInt(1))
-
 				hash := block.Hash()
 				if previewHash == hash {
 					continue
 				}
+
+				l.log.WithField("hash", hash.Hex()).WithField("id", l.chainID).WithField("is indexer", l.isIndexer)
 
 				previewHash = hash
 				l.indexContractTxs(block)
@@ -150,7 +149,7 @@ func (l *ListenData) run(ctx context.Context) {
 func (l *ListenData) indexContractTxs(block *types.Block) {
 	contractTXsOnBlock, err := l.filteringTx(block)
 	if err != nil {
-		l.log.WithError(err).Error("failed to filter tx")
+		l.log.WithError(err).WithField("id", l.chainID).WithField("is indexer", l.isIndexer).Error("failed to filter tx")
 		return
 	}
 	if len(contractTXsOnBlock) == 0 {
@@ -243,7 +242,7 @@ func (l *ListenData) prepareDataToInsert(inputs map[string][]string) ([]data.Tra
 
 func (l *ListenData) insertTxs(txs []data.Transactions, blockTime uint64) error {
 	for _, tx := range txs {
-		l.log.Debug(l.chainName, " tx: ", &tx)
+		l.log.WithField("id", l.chainID).WithField("is indexer", l.isIndexer).Debug(" tx: ", &tx)
 		selectedTxs, err := l.masterQ.TransactionsQ().New().FilterByPaymentID(tx.PaymentID).Select()
 		if err != nil {
 			return errors.Wrap(err, "failed to  select tx to db")
