@@ -1,0 +1,36 @@
+log:
+  level: debug
+  disable_sentry: true
+
+db:
+  url: postgres://postgres:password@localhost:5432/listener?sslmode=disable
+
+listener:
+  addr: :8000
+
+networks:
+  keys:
+    - name: 'Goerli'
+      chain_id: 5
+      start_block: 9600199
+      rpc:  "https://goerli.infura.io/v3/"
+    - name: 'BSC Testnet'
+      chain_id: 97
+      start_block: 9600199
+      rpc:  "https://data-seed-prebsc-2-s3.binance.org:8545/"
+
+
+
+meta_data:
+  header: "66613161666237613a"
+  footer: "3b"
+
+chain_listener:
+  pause_time: 10000
+
+cop:
+  disabled: true
+  endpoint: "http://..."
+  upstream: "http://..."
+  service_name: back-listener
+  service_port: 80
